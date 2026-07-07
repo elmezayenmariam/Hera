@@ -1,0 +1,57 @@
+name: Deploy HERA to GitHub Pages
+
+# This runs automatically every time you push changes to the "main" branch.
+# It does the same thing "npm run build" does on your own computer, then
+# publishes the result to your GitHub Pages site. You don't need to run
+# anything yourself — GitHub does it for you in the cloud.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: # also lets you click "Run workflow" manually on GitHub
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Get the code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build the app
+        run: npm run build
+
+      - name: Upload the built site
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Publish to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
