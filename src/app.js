@@ -1525,6 +1525,40 @@ function setupReveals(){
   els.forEach(el=>_revealObs.observe(el));
 }
 
+/* ---------- Typewriter headline (landing "What is HERA") ----------
+   Types the intro heading character-by-character once it scrolls into view,
+   then fades-and-slides up the paragraph + CTA marked `.tw-after`. The heading
+   markup ships empty (only a blinking caret) so this is what fills it. Respects
+   prefers-reduced-motion by painting the final state immediately. */
+const TW_TEXT = 'A decision-support framework for heritage under climate change.';
+let _twObs = null;
+function setupTypewriter(){
+  if(_twObs){ _twObs.disconnect(); _twObs = null; }
+  const el = document.getElementById('twTarget');
+  if(!el) return;
+  const caret = el.querySelector('.tw-caret');
+  const afters = Array.from(document.querySelectorAll('.tw-after'));
+  const textNode = document.createTextNode('');
+  el.insertBefore(textNode, caret || null);
+  const revealAfters = ()=>afters.forEach((a,k)=>setTimeout(()=>a.classList.add('in'), 140*k));
+  const reduced = typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const start = ()=>{
+    if(el.dataset.started) return; el.dataset.started = '1';
+    if(reduced){ textNode.nodeValue = TW_TEXT; el.classList.add('tw-complete'); revealAfters(); return; }
+    let i = 0;
+    (function step(){
+      textNode.nodeValue = TW_TEXT.slice(0, i);
+      if(i < TW_TEXT.length){ const ch = TW_TEXT[i]; i++; setTimeout(step, ch===' ' ? 60 : 32); }
+      else { el.classList.add('tw-complete'); revealAfters(); }
+    })();
+  };
+  if(reduced || typeof IntersectionObserver === 'undefined'){ start(); return; }
+  _twObs = new IntersectionObserver((entries)=>{
+    entries.forEach(e=>{ if(e.isIntersecting){ start(); _twObs.disconnect(); _twObs = null; } });
+  }, {threshold:0.5});
+  _twObs.observe(el);
+}
+
 /* ---------- Sidebar rail (persistent step navigation) ---------- */
 function sidebarHTML(){
   const steps = STEPS.map((s,i)=>{
@@ -1644,7 +1678,6 @@ function pageHome(){
       <div class="lnav-brand"><span class="mark">${icon('landmark',20)}</span><span class="nm">HERA</span></div>
       <div class="lnav-links">
         <button class="lnav-link" onclick="document.getElementById('framework').scrollIntoView({behavior:'smooth'})">The Framework</button>
-        <button class="lnav-link" onclick="toggleCompare()">Compare${n?` · ${n}`:''}</button>
         <button class="lnav-cta" onclick="startAssessment()">${icon('arrowRight',15)} Start Assessment</button>
       </div>
     </nav>
@@ -1818,12 +1851,12 @@ function pageESS(){
     </div>
     <div class="indicator-block">
       <div class="ihead"><span class="iname">Relative Humidity (%)</span><span class="iweight">33.3%</span></div>
-      <input type="number" value="${i.rh}" oninput="state.ess.rh=parseFloat(this.value)||0;render()">
+      <input type="number" value="${i.rh}" oninput="state.ess.rh=parseFloat(this.value)||0" onchange="render()">
       <div class="badge-row"><span class="badge">Optimal 40–60%</span><span class="badge">Acceptable 30–70%</span><span class="badge">Critical outside</span></div>
     </div>
     <div class="indicator-block">
       <div class="ihead"><span class="iname">Solar Radiation (W/m²)</span><span class="iweight">33.3%</span></div>
-      <input type="number" value="${i.solar}" oninput="state.ess.solar=parseFloat(this.value)||0;render()">
+      <input type="number" value="${i.solar}" oninput="state.ess.solar=parseFloat(this.value)||0" onchange="render()">
       <div class="badge-row"><span class="badge">Optimal &lt;200</span><span class="badge">Acceptable 200–500</span><span class="badge">Critical &gt;500</span></div>
     </div>
 
@@ -1858,11 +1891,11 @@ function pageBCS(){
       </div>
       <div class="indicator-block">
         <div class="ihead"><span class="iname">Cracking — Width (mm)</span><span class="iweight">30%</span></div>
-        <input type="number" step="0.1" value="${i.crack}" oninput="state.bcs.crack=parseFloat(this.value)||0;render()">
+        <input type="number" step="0.1" value="${i.crack}" oninput="state.bcs.crack=parseFloat(this.value)||0" onchange="render()">
       </div>
       <div class="indicator-block">
         <div class="ihead"><span class="iname">Surface Loss (% area)</span><span class="iweight">20%</span></div>
-        <input type="number" value="${i.surfaceLoss}" oninput="state.bcs.surfaceLoss=parseFloat(this.value)||0;render()">
+        <input type="number" value="${i.surfaceLoss}" oninput="state.bcs.surfaceLoss=parseFloat(this.value)||0" onchange="render()">
       </div>
       <div class="indicator-block">
         <div class="ihead"><span class="iname">Biological Growth</span><span class="iweight">10%</span></div>
@@ -1895,7 +1928,7 @@ function pageOIS(){
 
     <div class="indicator-block">
       <div class="ihead"><span class="iname">Occupancy Density (persons/m²)</span><span class="iweight">33.3%</span></div>
-      <input type="number" step="0.1" value="${i.density}" oninput="state.ois.density=parseFloat(this.value)||0;render()">
+      <input type="number" step="0.1" value="${i.density}" oninput="state.ois.density=parseFloat(this.value)||0" onchange="render()">
     </div>
     <div class="indicator-block">
       <div class="ihead"><span class="iname">Visitor Load</span><span class="iweight">33.3%</span></div>
@@ -2192,19 +2225,28 @@ function navRow(prev, next){
 }
 
 /* ============================== ROUTER ============================== */
+let _lastStepKey = null;
 function render(){
   const pages = [pageHome, pageBuilding, pageESS, pageBCS, pageOIS, pageResults, pageClimate, pagePhase2];
   // Step 0 is the cinematic landing — rendered full-bleed with its own top nav,
   // no sidebar. Every other step (and the compare view) uses the app shell.
   if(!state.compareView && state.step===0){
+    _lastStepKey = 'step0';
     document.getElementById('app').innerHTML = pageHome();
     destroyGeoMap();
     setupReveals();
+    setupTypewriter();
     return;
   }
+  // Only play the page-swap entrance animation when the step (or view) actually
+  // changes — not on the many in-page re-renders (typing, tab switches, geo
+  // fetches), which would otherwise re-animate the whole column on every input.
+  const stepKey = state.compareView ? 'compare' : 'step'+state.step;
+  const swap = stepKey !== _lastStepKey;
+  _lastStepKey = stepKey;
   const body = state.compareView ? pageCompare() : pages[state.step]();
   document.getElementById('app').innerHTML =
-    sidebarHTML() + `<main class="main"><div class="main-inner">` + header() + body + `</div></main>`;
+    sidebarHTML() + `<main class="main${swap?' swap':''}"><div class="main-inner">` + header() + body + `</div></main>`;
   if(!state.compareView && state.step===2){ mountGeoMap(); } else { destroyGeoMap(); }
   setupReveals();
 }
