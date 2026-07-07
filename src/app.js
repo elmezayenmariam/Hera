@@ -18,6 +18,7 @@ import { classify, bandColor, BANDS_GENERIC, BANDS_BCS, HRI_TABLE, computeESS, c
 import { isOnline, fetchJSON } from './data/network.js';
 import { KNOWLEDGE_BASE, retrieveKnowledge, buildQueryTags } from './data/knowledgeBase.js';
 import { SSP, BCS_ACCELERATION_K, projectScenario } from './data/climate.js';
+import { mountFeatureCarousel, unmountFeatureCarousel } from './featureCarousel.jsx';
 
 /* ============================== ICONS ==============================
    Inline stroke SVGs (Lucide-style, currentColor) used everywhere the UI
@@ -748,39 +749,82 @@ function buildActionPlan(scenarioKey){
    invented dates/figures) pending full documentation upload; framed as
    prototype records, consistent with how the rest of HERA flags
    not-yet-integrated data sources. */
+/* Case-study comparators selected for framework transferability across
+   adaptive-reuse heritage palaces, villas and landmark buildings of the
+   c.1880–1940 period — Baron Palace's typology, construction period and
+   public-access status. Two contextual groups: the Empain-developed Heliopolis
+   garden suburb, and Ismail-era Khedival Downtown Cairo.
+   Sources: Dobrowolska (2006); Ilbert (1981); Volait (2001); Raafat (2003);
+   Ministry of Tourism & Antiquities (2024). */
+const CASE_STUDY_CITATIONS = 'Dobrowolska (2006) · Ilbert (1981) · Volait (2001) · Raafat (2003) · Ministry of Tourism & Antiquities (2024)';
 const CASE_STUDY_LIBRARY = [
-  {id:'baron', name:'Baron Empain Palace', location:'Heliopolis, Cairo, Egypt',
-   material:['Limestone','Reinforced Concrete (early)'], typology:['Palace'], adaptiveReuse:['Museum','Cultural Center'],
+  {id:'baron', name:'Baron Empain Palace', location:'Heliopolis, Cairo', year:'1907–1911',
+   group:'Heliopolis — Garden Suburb', primary:true,
+   material:['Reinforced Concrete (early)','Limestone'], typology:['Palace'], adaptiveReuse:['Museum','Cultural Center'],
    climate:['hotarid','egypt'], techniques:['materialdecay','surfaceloss','occupancy'],
-   summary:'An early-20th-century Cairo palace conserved and opened as a public visitor attraction — a museum-type adaptive reuse under hot-arid conditions with highly ornamental, climate-vulnerable surfaces.',
-   strategies:['Structural consolidation of decorative concrete and stonework','Environmental controls introduced for public access','Visitor-flow management around fragile ornamental surfaces'],
+   summary:'Primary case study — Hennebique reinforced-masonry palace of Cambodian/Hindu-inspired design, conserved and reopened as a public museum. Highly ornamental, climate-vulnerable exposed surfaces.',
+   strategies:['Structural consolidation of early reinforced concrete and decorative stonework','Environmental controls introduced for public museum access','Visitor-flow management around fragile ornamental surfaces'],
    lessons:'Balancing public accessibility with conservation of ornamental, climate-vulnerable surfaces is the central challenge for museum-type adaptive reuse of Cairo-era palaces.',
-   references:['Egyptian Ministry of Antiquities — general project record']},
-  {id:'manial', name:'Prince Mohamed Ali Palace (Manial Palace)', location:'Rhoda Island, Cairo, Egypt',
-   material:['Limestone','Limestone + Brick'], typology:['Palace'], adaptiveReuse:['Museum'],
-   climate:['hotarid','egypt'], techniques:['materialdecay','humidity'],
-   summary:'A large early-20th-century palace complex restored and operated as a museum, combining multiple architectural styles across several pavilions.',
-   strategies:['Phased restoration across multiple structures within one complex','Conservation of decorative interior finishes alongside structural masonry repair'],
-   lessons:'Multi-building heritage complexes benefit from a phased, prioritized conservation approach rather than one uniform intervention across the whole site.',
-   references:['Egyptian Ministry of Antiquities — general project record']},
-  {id:'sakakini', name:'Sakakini Palace', location:'Daher, Cairo, Egypt',
-   material:['Limestone'], typology:['Palace'], adaptiveReuse:['Cultural Center','Vacant / Unused'],
+   references:['Raafat (2003)','Ministry of Tourism & Antiquities (2024)']},
+  {id:'heliopolishotel', name:'Heliopolis Palace Hotel', location:'Heliopolis, Cairo', year:'1910',
+   group:'Heliopolis — Garden Suburb',
+   material:['Limestone + Brick','Reinforced Concrete (early)'], typology:['Palace','Landmark Building'], adaptiveReuse:['Administrative','Mixed Use'],
+   climate:['hotarid','egypt'], techniques:['materialdecay','humidity','occupancy'],
+   summary:'The largest hotel of its era in the Empain-developed suburb, now Al-Ittihadiya Presidential Palace — a landmark conversion from hospitality to high-security state administrative use.',
+   strategies:['Adaptation of a large hospitality plan to secure administrative use','Retention of monumental Heliopolis-style masonry facades'],
+   lessons:'Very large single-function landmarks can absorb a wholesale change of use, but the conversion is driven by the new operational (occupancy/security) programme as much as by fabric condition.',
+   references:['Ilbert (1981)','Dobrowolska (2006)']},
+  {id:'basilica', name:'Basilica of Our Lady of Heliopolis', location:'Heliopolis, Cairo', year:'1910',
+   group:'Heliopolis — Garden Suburb',
+   material:['Reinforced Concrete (early)','Limestone'], typology:['Religious Building','Landmark Building'], adaptiveReuse:['Cultural Center','Educational'],
    climate:['hotarid','egypt'], techniques:['cracking','materialdecay'],
-   summary:'An ornate early-20th-century Cairo palace that underwent a long period of structural vulnerability before stabilization and conservation works — a precedent for recovering from a Critical/Immediate-Intervention-type condition.',
-   strategies:['Emergency structural stabilization prior to further conservation','Facade and ornamental plaster conservation'],
-   lessons:'Buildings that reach a Critical risk category can still be recovered, but require stabilization before any aesthetic or adaptive-reuse conservation work proceeds.',
-   references:['Egyptian Ministry of Antiquities — general project record']},
-  {id:'historiccairo', name:'Historic Cairo — General Precedent', location:'Historic Cairo, Egypt',
-   material:['Limestone','Brick Masonry'], typology:['Landmark Building','Religious Building','Public/Civic Building'],
-   adaptiveReuse:['Cultural Center','Educational','Mixed Use'], climate:['hotarid','egypt','aridregion'],
-   techniques:['surfaceloss','biologicalgrowth','humidity'],
-   summary:'A general reference class covering the wider stock of load-bearing masonry heritage buildings in Historic Cairo, sharing the same hot-arid climate and lime-based masonry vulnerabilities as this assessed building.',
-   strategies:['Lime-based repair mortars matched to local masonry','Preventive maintenance cycles calibrated to hot-arid, low-humidity-swing conditions'],
-   lessons:'Precedent from the broader Historic Cairo context is useful when a specific comparable building record is not yet available in the knowledge base.',
-   references:['UNESCO World Heritage inscription documentation — Historic Cairo']}
+   summary:'A Byzantine-Revival domed church and the Empain family mausoleum site — a religious landmark of the same suburb and construction period, sharing early-concrete dome construction.',
+   strategies:['Conservation of large-span early-concrete dome structure','Crack monitoring and stabilization of the domed roof'],
+   lessons:'Early reinforced-concrete domes of this generation need dedicated crack-monitoring regimes; their structural behaviour differs from the load-bearing masonry around them.',
+   references:['Raafat (2003)']},
+  {id:'orouba', name:'Al-Orouba Palace', location:'Heliopolis, Cairo', year:'1910',
+   group:'Heliopolis — Garden Suburb',
+   material:['Limestone','Limestone + Brick'], typology:['Palace','Public/Civic Building'], adaptiveReuse:['Administrative','Vacant / Unused'],
+   climate:['hotarid','egypt'], techniques:['materialdecay','occupancy'],
+   summary:'The former Heliopolis Company headquarters, later the Ministry of Defense / a state guesthouse — a palace-scale building repurposed for civic-administrative use within the same suburb.',
+   strategies:['Repurposing palatial interiors for administrative functions','Facade masonry conservation while in continuous official use'],
+   lessons:'Buildings kept in continuous administrative use tend to retain fabric better than vacant ones, but conservation must work around an occupied, operational programme.',
+   references:['Ilbert (1981)']},
+  {id:'abdeen', name:'Abdeen Palace', location:'Downtown, Cairo', year:'1863–1874',
+   group:'Khedival Cairo — Downtown',
+   material:['Limestone + Brick','Limestone'], typology:['Palace'], adaptiveReuse:['Museum'],
+   climate:['hotarid','egypt'], techniques:['materialdecay','surfaceloss'],
+   summary:'A royal masonry palace and the earliest reference point for the Khedival era, now operated as a museum — a benchmark for high-value palatial adaptive reuse in Downtown Cairo.',
+   strategies:['Museum-standard environmental control of richly decorated royal interiors','Phased conservation across an extensive palace complex'],
+   lessons:'The upper end of the palatial spectrum shows that intensive, museum-grade environmental control is achievable, but is resource-intensive across large complexes.',
+   references:['Volait (2001)','Ministry of Tourism & Antiquities (2024)']},
+  {id:'bourse', name:'Cairo Stock Exchange (Bourse)', location:'Downtown, Cairo', year:'1928',
+   group:'Khedival Cairo — Downtown',
+   material:['Reinforced Concrete (early)','Limestone'], typology:['Public/Civic Building','Landmark Building'], adaptiveReuse:['Administrative','Mixed Use'],
+   climate:['hotarid','egypt'], techniques:['surfaceloss','occupancy'],
+   summary:'A Neoclassical financial-district landmark of the interwar period with clear adaptive-reuse potential — a civic/commercial precedent rather than a palace.',
+   strategies:['Conservation of a Neoclassical civic facade','Adaptation of trading-hall interiors for mixed civic/cultural reuse'],
+   lessons:'Civic/commercial landmarks broaden the framework beyond palaces, testing its transferability to non-residential adaptive-reuse programmes.',
+   references:['Volait (2001)','Raafat (2003)']},
+  {id:'sednaoui', name:'Sednaoui Department Store', location:'Khazindar Sq, Downtown, Cairo', year:'1913',
+   group:'Khedival Cairo — Downtown',
+   material:['Brick Masonry','Other'], typology:['Public/Civic Building','Landmark Building'], adaptiveReuse:['Mixed Use'],
+   climate:['hotarid','egypt'], techniques:['materialdecay','humidity','surfaceloss'],
+   summary:'An iron-and-glass Art Nouveau department store with a glazed central atrium, still in active commercial reuse — a rare metal/glass structural type for the period and climate.',
+   strategies:['Corrosion control of exposed iron structure and glazed atrium','Maintaining active commercial use during conservation'],
+   lessons:'Iron-and-glass structures introduce metal-corrosion and glazing failure modes not seen in masonry palaces, requiring a different maintenance regime.',
+   references:['Raafat (2003)']},
+  {id:'immobilia', name:'Immobilia Building', location:'Downtown, Cairo', year:'1938',
+   group:'Khedival Cairo — Downtown',
+   material:['Reinforced Concrete (early)'], typology:['Landmark Building','Public/Civic Building'], adaptiveReuse:['Mixed Use'],
+   climate:['hotarid','egypt'], techniques:['surfaceloss','cracking','occupancy'],
+   summary:'A late Art Deco high-rise marking the transitional end of the 1880–1940 study period — a fully reinforced-concrete, mixed-use tower that bounds the framework\'s upper era limit.',
+   strategies:['Concrete-repair and reinforcement-corrosion management on a high-rise','Coordinating conservation with dense mixed-use occupancy'],
+   lessons:'The end of the study period is dominated by reinforced-concrete high-rises whose dominant risk is reinforcement corrosion — a useful contrast to the load-bearing masonry baseline.',
+   references:['Raafat (2003)','Ministry of Tourism & Antiquities (2024)']}
 ];
 function retrieveCaseStudies(building, drivers, maxN){
-  maxN = maxN || 4;
+  maxN = maxN || 6;
   const scored = CASE_STUDY_LIBRARY.map(cs=>{
     let score = 0; const reasons = [];
     if(building.material && cs.material.some(m=>building.material.indexOf(m.split(' ')[0])>=0)){ score+=2; reasons.push('matching construction material'); }
@@ -1483,7 +1527,7 @@ function capVisualKBPanel(plan){
 
 /* ---------- Case Studies gallery (Gallery4-style carousel, themed) ---------- */
 function capCasesGallery(plan){
-  const matches = retrieveCaseStudies(plan.a.b, plan.a.drivers, 5);
+  const matches = retrieveCaseStudies(plan.a.b, plan.a.drivers, 6);
   return `
     <div class="gal-head">
       <div><span class="eyebrow">Precedents</span><h3 class="gal-title">Related case studies</h3></div>
@@ -1500,9 +1544,11 @@ function capCasesGallery(plan){
           <div class="gal-media">
             ${img ? `<img src="${img}" alt="${cs.name}" loading="lazy" onerror="this.remove()">` : `<div class="gal-ph">${icon('landmark',34)}</div>`}
             <div class="gal-scrim"></div>
+            ${cs.primary ? `<div class="gal-badge">Primary case study</div>` : ''}
             <div class="gal-cap">
-              <div class="gal-loc">${cs.location}</div>
+              <div class="gal-loc">${cs.location}${cs.year?` · ${cs.year}`:''}</div>
               <div class="gal-name">${cs.name}</div>
+              ${cs.group ? `<div class="gal-group">${cs.group}</div>` : ''}
               <p class="gal-desc">${cs.summary}</p>
               <div class="gal-why">${reasons.length ? reasons.join(' · ') : 'regional hot-arid precedent'}</div>
             </div>
@@ -1510,7 +1556,7 @@ function capCasesGallery(plan){
         </article>`;
       }).join('')}
     </div>
-    <div class="gal-foot">Photographs retrieved live from Wikimedia Commons, matched to each precedent — no AI-generated imagery.</div>`;
+    <div class="gal-foot">Comparators for framework transferability across adaptive-reuse heritage buildings of the 1880–1940 period. Photographs retrieved live from Wikimedia Commons — no AI-generated imagery. Sources: ${CASE_STUDY_CITATIONS}.</div>`;
 }
 
 /* ---------- Scroll-reveal observer (landing) ---------- */
@@ -1531,23 +1577,33 @@ function setupReveals(){
    markup ships empty (only a blinking caret) so this is what fills it. Respects
    prefers-reduced-motion by painting the final state immediately. */
 const TW_TEXT = 'A decision-support framework for heritage under climate change.';
+const TW_EMPH = 'heritage';   // rendered italic + accent while typing
+function twHTML(n){
+  // Return the first n characters of TW_TEXT with the emphasized word wrapped,
+  // so the accent word keeps its styling as it is progressively revealed.
+  const start = TW_TEXT.indexOf(TW_EMPH), end = start + TW_EMPH.length;
+  if(n <= start) return TW_TEXT.slice(0, n);
+  const before = TW_TEXT.slice(0, start);
+  const emph = TW_TEXT.slice(start, Math.min(n, end));
+  const after = n > end ? TW_TEXT.slice(end, n) : '';
+  return `${before}<em class="tw-em">${emph}</em>${after}`;
+}
 let _twObs = null;
 function setupTypewriter(){
   if(_twObs){ _twObs.disconnect(); _twObs = null; }
   const el = document.getElementById('twTarget');
   if(!el) return;
-  const caret = el.querySelector('.tw-caret');
+  const type = el.querySelector('.tw-type');
+  if(!type) return;
   const afters = Array.from(document.querySelectorAll('.tw-after'));
-  const textNode = document.createTextNode('');
-  el.insertBefore(textNode, caret || null);
   const revealAfters = ()=>afters.forEach((a,k)=>setTimeout(()=>a.classList.add('in'), 140*k));
   const reduced = typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches;
   const start = ()=>{
     if(el.dataset.started) return; el.dataset.started = '1';
-    if(reduced){ textNode.nodeValue = TW_TEXT; el.classList.add('tw-complete'); revealAfters(); return; }
+    if(reduced){ type.innerHTML = twHTML(TW_TEXT.length); el.classList.add('tw-complete'); revealAfters(); return; }
     let i = 0;
     (function step(){
-      textNode.nodeValue = TW_TEXT.slice(0, i);
+      type.innerHTML = twHTML(i);
       if(i < TW_TEXT.length){ const ch = TW_TEXT[i]; i++; setTimeout(step, ch===' ' ? 60 : 32); }
       else { el.classList.add('tw-complete'); revealAfters(); }
     })();
@@ -1591,8 +1647,16 @@ function sidebarHTML(){
 function header(){
   const kicker = state.compareView ? 'Portfolio' : (state.step===0 ? 'Overview' : `Step ${state.step} of ${STEPS.length-1}`);
   const title = state.compareView ? 'Building Comparison' : STEPS[state.step];
+  const n = state.projects.length;
   return `<div class="topbar">
     <div class="kicker"><span class="k">${kicker}</span><span class="t">${title}</span></div>
+    <div class="topbar-right">
+      <button class="topbar-compare ${state.compareView?'active':''}" onclick="toggleCompare()" title="${state.compareView?'Back to assessment':'Compare buildings'}">
+        <span class="tc-ic">${icon('compare',16)}</span>
+        <span class="tc-tx">${state.compareView?'Assessment':'Compare'}</span>
+        ${!state.compareView && n ? `<span class="tc-cnt">${n}</span>` : ''}
+      </button>
+    </div>
   </div>`;
 }
 
@@ -1703,11 +1767,22 @@ function pageHome(){
     <section class="landing-intro" id="about">
       <div class="intro-wrap reveal">
         <span class="eyebrow">What is HERA</span>
-        <h2 id="twTarget" class="tw"><span class="tw-caret"></span></h2>
+        <h2 id="twTarget" class="tw"><span class="tw-type"></span><span class="tw-caret"></span></h2>
         <p class="tw-after">HERA reads environmental stress, building condition and occupancy into a single Heritage Risk
         Index — projected forward under IPCC climate scenarios — and turns that score into a prioritized,
         source-grounded conservation plan for adaptive-reuse heritage buildings.</p>
         <button class="btn-solid tw-after" onclick="startAssessment()"><span>Start Assessment</span> ${icon('arrowRight',17)}</button>
+      </div>
+    </section>
+
+    <section class="landing-carousel" id="workflow">
+      <div class="wrap">
+        <div class="section-head reveal center">
+          <span class="eyebrow">The Workflow</span>
+          <h2>Four steps, from reading to <em>response</em>.</h2>
+          <p>An interactive walkthrough of the assessment pipeline — it cycles automatically, or click a step.</p>
+        </div>
+        <div id="featureCarousel" class="feature-carousel-mount reveal"></div>
       </div>
     </section>
 
@@ -1755,23 +1830,49 @@ function pageHome(){
             <span class="flip-hint">${icon('search',13)} Weightings &amp; classification</span>
           </div>
           <div class="frame-card wide o5 reveal">
-            <div class="fw-l">
-              <div class="ftag">05 · Climate Scenarios → Future HRI</div>
-              <h3>What will the risk be in 2100?</h3>
-              <p>The Current HRI is projected through IPCC AR6 climate pathways: each scenario shifts
-              temperature, humidity and solar radiation, which drives a projected environmental stress and,
-              in turn, a projected building condition — yielding the <b>Future HRI</b>. A rule-based expert
-              layer then briefly translates that score into a conservation strategy.</p>
-              <div class="o5-flow">
-                <span class="o5-chip">Current HRI</span><span class="o5-arr">→</span>
-                <span class="o5-chip alt">SSP2-4.5 · SSP5-8.5</span><span class="o5-arr">→</span>
-                <span class="o5-chip">Projected T · RH · Solar</span><span class="o5-arr">→</span>
-                <span class="o5-chip">Projected ESS → BCS</span><span class="o5-arr">→</span>
-                <span class="o5-chip strong">Future HRI</span><span class="o5-arr">→</span>
-                <span class="o5-chip">Strategy</span>
+            <div class="o5-top">
+              <div class="fw-l">
+                <div class="ftag">05 · Climate Scenarios → Future HRI</div>
+                <h3>What will the risk be in <em>2100</em>?</h3>
+                <p>HERA re-runs today's Heritage Risk Index through the IPCC AR6 climate engine: each pathway
+                shifts temperature, humidity and solar radiation, which drives a projected environmental stress
+                and, in turn, a projected building condition — yielding the <b>Future HRI</b>, then a brief
+                rule-based conservation strategy.</p>
+              </div>
+              <button class="btn-hero" onclick="startAssessment()">Start with a building ${icon('arrowRight',17)}</button>
+            </div>
+
+            <div class="hri-flow" aria-label="Future HRI projection logic">
+              <div class="hf-col hf-in">
+                <span class="hf-k">Input</span>
+                <div class="hf-tile">Current<br>HRI</div>
+              </div>
+
+              <div class="hf-arrow">${icon('arrowRight',20)}</div>
+
+              <div class="hf-col hf-engine">
+                <span class="hf-k">${icon('climate',13)} Climate Scenario Engine · IPCC AR6</span>
+                <div class="hf-pills">
+                  <span class="hf-pill">Current Conditions</span>
+                  <span class="hf-pill a">SSP2-4.5 · Moderate</span>
+                  <span class="hf-pill b">SSP5-8.5 · Severe</span>
+                </div>
+                <div class="hf-cascade">
+                  <span class="hf-step"><b>1</b> Projected climate — Temperature · Humidity · Solar</span>
+                  <span class="hf-down">${icon('arrowRight',13)}</span>
+                  <span class="hf-step"><b>2</b> Projected Environmental Stress (ESS)</span>
+                  <span class="hf-down">${icon('arrowRight',13)}</span>
+                  <span class="hf-step"><b>3</b> Projected Building Condition — Decay · Cracking · Surface loss · Bio-growth</span>
+                </div>
+              </div>
+
+              <div class="hf-arrow">${icon('arrowRight',20)}</div>
+
+              <div class="hf-col hf-out">
+                <span class="hf-k">Output</span>
+                <div class="hf-tile strong">Future<br>HRI</div>
               </div>
             </div>
-            <button class="btn-hero" onclick="startAssessment()">Start with a building ${icon('arrowRight',17)}</button>
           </div>
         </div>
       </div>
@@ -2236,8 +2337,10 @@ function render(){
     destroyGeoMap();
     setupReveals();
     setupTypewriter();
+    mountFeatureCarousel();
     return;
   }
+  unmountFeatureCarousel();
   // Only play the page-swap entrance animation when the step (or view) actually
   // changes — not on the many in-page re-renders (typing, tab switches, geo
   // fetches), which would otherwise re-animate the whole column on every input.

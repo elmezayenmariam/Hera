@@ -1,0 +1,6 @@
+/* Tailwind layers for the React feature-carousel island. With preflight
+   disabled (tailwind.config.js), @tailwind base emits almost nothing, so this
+   does not reset or override the app's own style.css. */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;

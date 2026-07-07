@@ -7,6 +7,7 @@
 // change needed to make the existing markup-generation code work unmodified
 // inside a module bundler.
 import './style.css';
+import './tailwind.css';   // Tailwind utilities for the React feature-carousel island (preflight off)
 import {
   state, render, go, toggleCompare, newAssessment, saveCurrentProject, loadProject, removeProject,
   geoSearch, geoFetchEnvironment, selectGeoResult, openCapModal, closeCapModal, copyPrompt, retryImages,
