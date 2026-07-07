@@ -823,6 +823,21 @@ const CASE_STUDY_LIBRARY = [
    lessons:'The end of the study period is dominated by reinforced-concrete high-rises whose dominant risk is reinforcement corrosion — a useful contrast to the load-bearing masonry baseline.',
    references:['Raafat (2003)','Ministry of Tourism & Antiquities (2024)']}
 ];
+/* Hand-tuned Wikimedia Commons search terms per building — the raw name+location
+   string is too specific for some, so these give the online image search its best
+   chance of returning a real photograph. */
+const CASE_IMG_QUERY = {
+  baron:'Baron Empain Palace',
+  heliopolishotel:'Heliopolis Palace Hotel Cairo',
+  basilica:'Basilica of Our Lady of Heliopolis',
+  orouba:'Al-Orouba Palace',
+  abdeen:'Abdeen Palace Cairo',
+  bourse:'Egyptian Exchange Cairo',
+  sednaoui:'Sednaoui department store Cairo',
+  immobilia:'Immobilia Building Cairo'
+};
+function csImgQuery(cs){ return CASE_IMG_QUERY[cs.id] || `${cs.name} Cairo`; }
+function findCaseStudy(id){ return CASE_STUDY_LIBRARY.find(c=>c.id===id); }
 function retrieveCaseStudies(building, drivers, maxN){
   maxN = maxN || 6;
   const scored = CASE_STUDY_LIBRARY.map(cs=>{
@@ -1248,7 +1263,7 @@ function pagePhase2(){
         <div class="cap-panel">${body}</div>
       </div>
     </div>
-  </div>${navRow(6,8)}${capModalHTML()}`;
+  </div>${navRow(6,8)}${capModalHTML()}${caseStudyModalHTML()}`;
 }
 
 const state = {
@@ -1267,6 +1282,8 @@ const state = {
   capTab: 'strategy',
   capModalId: null,
   pillarModal: null,
+  workflowModal: false,
+  caseModalId: null,
   isOnline: isOnline(),
   imageCache: {}
 };
@@ -1538,11 +1555,12 @@ function capCasesGallery(plan){
     </div>
     <div class="gal-track" id="galTrack">
       ${matches.map(({cs, reasons})=>{
-        const entry = getImages(`${cs.name} ${cs.location}`, 1);
+        const entry = getImages(csImgQuery(cs), 6);
         const img = (entry.status==='ready' && entry.images.length) ? entry.images[0].thumbUrl : null;
-        return `<article class="gal-card">
+        return `<article class="gal-card" tabindex="0" role="button" aria-label="Open ${cs.name} case study"
+            onclick="openCaseStudy('${cs.id}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openCaseStudy('${cs.id}')}">
           <div class="gal-media">
-            ${img ? `<img src="${img}" alt="${cs.name}" loading="lazy" onerror="this.remove()">` : `<div class="gal-ph">${icon('landmark',34)}</div>`}
+            ${img ? `<img src="${img}" alt="${cs.name}" loading="lazy" onerror="this.style.display='none'">` : `<div class="gal-ph">${icon('landmark',34)}</div>`}
             <div class="gal-scrim"></div>
             ${cs.primary ? `<div class="gal-badge">Primary case study</div>` : ''}
             <div class="gal-cap">
@@ -1550,7 +1568,7 @@ function capCasesGallery(plan){
               <div class="gal-name">${cs.name}</div>
               ${cs.group ? `<div class="gal-group">${cs.group}</div>` : ''}
               <p class="gal-desc">${cs.summary}</p>
-              <div class="gal-why">${reasons.length ? reasons.join(' · ') : 'regional hot-arid precedent'}</div>
+              <div class="gal-open">${icon('search',13)} View pictures &amp; details</div>
             </div>
           </div>
         </article>`;
@@ -1558,6 +1576,42 @@ function capCasesGallery(plan){
     </div>
     <div class="gal-foot">Comparators for framework transferability across adaptive-reuse heritage buildings of the 1880–1940 period. Photographs retrieved live from Wikimedia Commons — no AI-generated imagery. Sources: ${CASE_STUDY_CITATIONS}.</div>`;
 }
+
+/* ---------- Case-study detail modal (pictures + data) ---------- */
+function caseStudyModalHTML(){
+  const cs = state.caseModalId ? findCaseStudy(state.caseModalId) : null;
+  if(!cs) return '';
+  return `<div class="modal-overlay case-overlay" onclick="if(event.target===this)closeCaseStudy()">
+    <div class="case-box">
+      <div class="case-head">
+        <div>
+          ${cs.group?`<span class="eyebrow">${cs.group}</span>`:''}
+          <h3>${cs.name}</h3>
+          <div class="case-sub">${icon('pin',13)} ${cs.location}${cs.year?` · ${cs.year}`:''}${cs.primary?` · <span class="case-primary">Primary case study</span>`:''}</div>
+        </div>
+        <button class="ghost pill-x" onclick="closeCaseStudy()">${icon('close',16)}</button>
+      </div>
+      <div class="case-gallery">${imageResultsHTML(csImgQuery(cs), 6, cs.name+' — no photographs found on Wikimedia Commons')}</div>
+      <div class="case-data">
+        <p class="case-summary">${cs.summary}</p>
+        <div class="case-cols">
+          <div class="case-sec">
+            <div class="case-sec-h">${icon('clipboard',14)} Conservation approach</div>
+            <ul>${cs.strategies.map(s=>`<li>${s}</li>`).join('')}</ul>
+          </div>
+          <div class="case-sec">
+            <div class="case-sec-h">${icon('spark',14)} Lessons for this building</div>
+            <p>${cs.lessons}</p>
+            <div class="case-sec-h" style="margin-top:14px;">${icon('book',14)} Sources</div>
+            <div class="case-refs">${cs.references.join(' · ')}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+function openCaseStudy(id){ state.caseModalId = id; const cs = findCaseStudy(id); if(cs) getImages(csImgQuery(cs), 6); render(); }
+function closeCaseStudy(){ state.caseModalId = null; render(); }
 
 /* ---------- Scroll-reveal observer (landing) ---------- */
 let _revealObs = null;
@@ -1742,6 +1796,7 @@ function pageHome(){
       <div class="lnav-brand"><span class="mark">${icon('landmark',20)}</span><span class="nm">HERA</span></div>
       <div class="lnav-links">
         <button class="lnav-link" onclick="document.getElementById('framework').scrollIntoView({behavior:'smooth'})">The Framework</button>
+        <button class="lnav-icon" onclick="toggleCompare()" title="Compare buildings${n?` (${n})`:''}" aria-label="Compare buildings">${icon('compare',18)}${n?`<span class="lnav-badge">${n}</span>`:''}</button>
         <button class="lnav-cta" onclick="startAssessment()">${icon('arrowRight',15)} Start Assessment</button>
       </div>
     </nav>
@@ -1775,17 +1830,6 @@ function pageHome(){
       </div>
     </section>
 
-    <section class="landing-carousel" id="workflow">
-      <div class="wrap">
-        <div class="section-head reveal center">
-          <span class="eyebrow">The Workflow</span>
-          <h2>Four steps, from reading to <em>response</em>.</h2>
-          <p>An interactive walkthrough of the assessment pipeline — it cycles automatically, or click a step.</p>
-        </div>
-        <div id="featureCarousel" class="feature-carousel-mount reveal"></div>
-      </div>
-    </section>
-
     <section class="landing-body" id="framework">
       <div class="ghost-word">HERITAGE</div>
       <div class="wrap">
@@ -1794,6 +1838,7 @@ function pageHome(){
           <h2>Four measures, one <em>defensible</em> index.</h2>
           <p>HERA layers three assessed dimensions into a single Heritage Risk Index, then translates that
           score into a concrete, source-grounded conservation response — not generic advice.</p>
+          <button class="workflow-open" onclick="openWorkflow()">${icon('spark',15)} See the interactive 4-step workflow</button>
         </div>
         ${n ? `<div class="note" style="margin-bottom:26px;"><b>${n} building${n>1?'s':''}</b> saved for comparison. Open <b>Compare buildings</b> to see which needs intervention first.</div>` : ''}
         <div class="frame-grid">
@@ -1834,52 +1879,42 @@ function pageHome(){
               <div class="fw-l">
                 <div class="ftag">05 · Climate Scenarios → Future HRI</div>
                 <h3>What will the risk be in <em>2100</em>?</h3>
-                <p>HERA re-runs today's Heritage Risk Index through the IPCC AR6 climate engine: each pathway
-                shifts temperature, humidity and solar radiation, which drives a projected environmental stress
-                and, in turn, a projected building condition — yielding the <b>Future HRI</b>, then a brief
-                rule-based conservation strategy.</p>
+                <p>HERA projects today's Heritage Risk Index forward through IPCC AR6 climate pathways to
+                estimate the <b>Future HRI</b> — and the conservation strategy it calls for.</p>
               </div>
               <button class="btn-hero" onclick="startAssessment()">Start with a building ${icon('arrowRight',17)}</button>
             </div>
-
-            <div class="hri-flow" aria-label="Future HRI projection logic">
-              <div class="hf-col hf-in">
-                <span class="hf-k">Input</span>
-                <div class="hf-tile">Current<br>HRI</div>
-              </div>
-
-              <div class="hf-arrow">${icon('arrowRight',20)}</div>
-
-              <div class="hf-col hf-engine">
-                <span class="hf-k">${icon('climate',13)} Climate Scenario Engine · IPCC AR6</span>
-                <div class="hf-pills">
-                  <span class="hf-pill">Current Conditions</span>
-                  <span class="hf-pill a">SSP2-4.5 · Moderate</span>
-                  <span class="hf-pill b">SSP5-8.5 · Severe</span>
-                </div>
-                <div class="hf-cascade">
-                  <span class="hf-step"><b>1</b> Projected climate — Temperature · Humidity · Solar</span>
-                  <span class="hf-down">${icon('arrowRight',13)}</span>
-                  <span class="hf-step"><b>2</b> Projected Environmental Stress (ESS)</span>
-                  <span class="hf-down">${icon('arrowRight',13)}</span>
-                  <span class="hf-step"><b>3</b> Projected Building Condition — Decay · Cracking · Surface loss · Bio-growth</span>
-                </div>
-              </div>
-
-              <div class="hf-arrow">${icon('arrowRight',20)}</div>
-
-              <div class="hf-col hf-out">
-                <span class="hf-k">Output</span>
-                <div class="hf-tile strong">Future<br>HRI</div>
-              </div>
+            <div class="hri-flow" aria-label="Future HRI projection">
+              <span class="hf-node">Current HRI</span>
+              <span class="hf-arrow">${icon('arrowRight',18)}</span>
+              <span class="hf-node mid">IPCC AR6 pathways<b>SSP2-4.5 · SSP5-8.5</b></span>
+              <span class="hf-arrow">${icon('arrowRight',18)}</span>
+              <span class="hf-node strong">Future HRI</span>
             </div>
           </div>
         </div>
       </div>
     </section>
     ${pillarModalHTML()}
+    ${workflowModalHTML()}
   </div>`;
 }
+
+/* ---------- Workflow carousel modal (React island, opened on demand) ---------- */
+function workflowModalHTML(){
+  if(!state.workflowModal) return '';
+  return `<div class="modal-overlay workflow-overlay" onclick="if(event.target===this)closeWorkflow()">
+    <div class="workflow-box">
+      <div class="workflow-head">
+        <div><span class="eyebrow">The Workflow</span><h3>Four steps, from reading to response</h3></div>
+        <button class="ghost pill-x" onclick="closeWorkflow()">${icon('close',16)}</button>
+      </div>
+      <div id="featureCarousel" class="feature-carousel-mount"></div>
+    </div>
+  </div>`;
+}
+function openWorkflow(){ state.workflowModal = true; render(); }
+function closeWorkflow(){ state.workflowModal = false; render(); }
 
 function pageBuilding(){
   const b = state.building;
@@ -2337,7 +2372,7 @@ function render(){
     destroyGeoMap();
     setupReveals();
     setupTypewriter();
-    mountFeatureCarousel();
+    if(state.workflowModal) mountFeatureCarousel(); else unmountFeatureCarousel();
     return;
   }
   unmountFeatureCarousel();
@@ -2358,7 +2393,8 @@ function render(){
 Object.assign(window, {
   openPillar, closePillar, startAssessment,
   addBuildingImages, removeBuildingImage,
-  stripHoverStart, stripHoverStop, stripStep
+  stripHoverStart, stripHoverStop, stripStep,
+  openWorkflow, closeWorkflow, openCaseStudy, closeCaseStudy
 });
 /* ============================== CONNECTIVITY ============================== */
 loadImageCache(); // populate state.imageCache from localStorage, if available — degrades gracefully if not
