@@ -581,6 +581,21 @@ details summary:hover{color:var(--purple2);}
 /* "What is HERA" intro slide */
 .landing-intro{background:var(--bg2); border-bottom:1px solid var(--border); padding:clamp(70px,12vh,140px) clamp(20px,4vw,52px); text-align:center;}
 .intro-wrap{max-width:780px; margin:0 auto; display:flex; flex-direction:column; align-items:center;}
+
+/* --- Art Nouveau frame around the intro (corner ornaments + double border).
+       The corners are fixed-aspect SVGs that scale via clamp(); the plain border
+       between them stretches, so the frame adapts from desktop to phone without
+       distorting the artwork. --- */
+.ornate-frame{position:relative; max-width:960px; margin:0 auto;
+  padding:clamp(52px,9vw,88px) clamp(34px,8vw,80px);
+  border:1.5px solid rgba(176,83,42,.35); border-radius:10px;}
+.ornate-frame::before{content:""; position:absolute; inset:7px; border:1px solid rgba(176,83,42,.16); border-radius:6px; pointer-events:none;}
+.of-corner{position:absolute; width:clamp(60px,13vw,138px); line-height:0; pointer-events:none;}
+.of-corner svg{width:100%; height:auto; display:block;}
+.of-corner.tl{top:-9px; left:-9px;}
+.of-corner.tr{top:-9px; right:-9px; transform:scaleX(-1);}
+.of-corner.bl{bottom:-9px; left:-9px; transform:scaleY(-1);}
+.of-corner.br{bottom:-9px; right:-9px; transform:scale(-1,-1);}
 .intro-wrap .eyebrow{margin-bottom:18px;}
 .intro-wrap h2{font-family:var(--serif); font-weight:500; font-size:clamp(30px,4.6vw,52px); line-height:1.08; letter-spacing:-.02em; color:var(--text); margin-bottom:22px;}
 .intro-wrap h2 em{font-style:italic; color:var(--purple);}

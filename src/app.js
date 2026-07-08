@@ -1863,6 +1863,32 @@ function removeProject(id){
 }
 
 /* ============================== PAGES ============================== */
+/* ---------- Art Nouveau corner ornament (landing "What is HERA" frame) ----------
+   One hand-drawn corner flourish, drawn for the TOP-LEFT and mirrored via CSS
+   transforms for the other three corners. Inline SVG so it inherits theme colors
+   (terracotta strokes) and scales crisply at any size, which is what makes the
+   frame adapt cleanly from desktop to phone: the corners shrink with clamp()
+   while the plain double border between them stretches. Muted teal + ochre leaf
+   fills echo the Art Nouveau reference artwork. */
+function ornamentCorner(){
+  return `<svg viewBox="0 0 150 150" fill="none" aria-hidden="true">
+    <path d="M150 10 C104 5 58 7 34 18 C18 25 10 40 13 57" stroke="var(--purple)" stroke-width="2.4" stroke-linecap="round" opacity=".85"/>
+    <path d="M10 150 C5 104 7 58 18 34" stroke="var(--purple)" stroke-width="2.4" stroke-linecap="round" opacity=".85"/>
+    <path d="M13 57 C16 71 31 76 39 66 C46 58 39 47 30 50 C24 52 23 59 28 62" stroke="var(--purple)" stroke-width="2.1" stroke-linecap="round" opacity=".8"/>
+    <path d="M70 9 C64 21 72 31 84 28 C93 26 94 15 86 13" stroke="var(--purple)" stroke-width="1.9" stroke-linecap="round" opacity=".65"/>
+    <path d="M9 70 C21 64 31 72 28 84 C26 93 15 94 13 86" stroke="var(--purple)" stroke-width="1.9" stroke-linecap="round" opacity=".65"/>
+    <path d="M96 10 C106 1 124 0 136 6 C126 17 108 19 96 10 Z" fill="#5E8073" opacity=".85"/>
+    <path d="M52 16 C58 5 72 0 82 4 C76 14 62 20 52 16 Z" fill="#7FA192" opacity=".85"/>
+    <path d="M10 96 C1 106 0 124 6 136 C17 126 19 108 10 96 Z" fill="#5E8073" opacity=".85"/>
+    <path d="M16 52 C5 58 0 72 4 82 C14 76 20 62 16 52 Z" fill="#7FA192" opacity=".85"/>
+    <path d="M34 30 C40 22 52 20 58 25 C52 33 40 36 34 30 Z" fill="#C4703C" opacity=".9"/>
+    <path d="M30 34 C22 40 20 52 25 58 C33 52 36 40 30 34 Z" fill="var(--mod)" opacity=".85"/>
+    <circle cx="90" cy="20" r="3" fill="var(--purple)" opacity=".8"/>
+    <circle cx="20" cy="90" r="3" fill="var(--purple)" opacity=".8"/>
+    <circle cx="45" cy="45" r="2.6" fill="var(--mod)" opacity=".9"/>
+  </svg>`;
+}
+
 /* ---------- Cinematic landing (step 0, full-bleed, no sidebar) ---------- */
 function heroRoute(){
   // Wadi-Rum-style trek line: the assessment pipeline as an expedition route.
@@ -1922,13 +1948,19 @@ function pageHome(){
     </header>
 
     <section class="landing-intro" id="about">
-      <div class="intro-wrap reveal">
-        <span class="eyebrow">What is HERA</span>
-        <h2 id="twTarget" class="tw"><span class="tw-type"></span><span class="tw-caret"></span></h2>
-        <p class="tw-after">HERA reads environmental stress, building condition and occupancy into a single Heritage Risk
-        Index, projected forward under IPCC climate scenarios, and turns that score into a prioritized,
-        source-grounded conservation plan for adaptive-reuse heritage buildings.</p>
-        <button class="btn-solid tw-after" onclick="startAssessment()"><span>Start Assessment</span> ${icon('arrowRight',17)}</button>
+      <div class="ornate-frame reveal">
+        <span class="of-corner tl" aria-hidden="true">${ornamentCorner()}</span>
+        <span class="of-corner tr" aria-hidden="true">${ornamentCorner()}</span>
+        <span class="of-corner bl" aria-hidden="true">${ornamentCorner()}</span>
+        <span class="of-corner br" aria-hidden="true">${ornamentCorner()}</span>
+        <div class="intro-wrap">
+          <span class="eyebrow">What is HERA</span>
+          <h2 id="twTarget" class="tw"><span class="tw-type"></span><span class="tw-caret"></span></h2>
+          <p class="tw-after">HERA reads environmental stress, building condition and occupancy into a single Heritage Risk
+          Index, projected forward under IPCC climate scenarios, and turns that score into a prioritized,
+          source-grounded conservation plan for adaptive-reuse heritage buildings.</p>
+          <button class="btn-solid tw-after" onclick="startAssessment()"><span>Start Assessment</span> ${icon('arrowRight',17)}</button>
+        </div>
       </div>
     </section>
 
