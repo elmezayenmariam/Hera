@@ -228,8 +228,10 @@ a{color:var(--purple2);}
 .card{
   background:var(--bg2); border:1px solid var(--border); border-radius:var(--r-lg);
   padding:34px 36px; margin-top:22px; box-shadow:var(--sh-2);
-  animation:cardIn .4s ease both;
 }
+/* Entrance only on a real step/view change (main.swap), so in-page re-renders
+   (image loads, input changes) don't replay it and cause a "refresh" flash. */
+.main.swap .card{animation:cardIn .4s ease both;}
 .card>h2{font-size:30px; font-weight:600; margin-bottom:6px; color:var(--text); letter-spacing:-.015em;}
 .card .sub{color:var(--muted); font-size:14px; margin-bottom:24px; max-width:70ch; line-height:1.6;}
 .accentbar{width:38px; height:3px; background:var(--purple); border-radius:2px; margin-bottom:16px;}
@@ -776,7 +778,7 @@ details summary:hover{color:var(--purple2);}
 .img-thumb button svg{width:12px; height:12px;}
 
 /* --- CAP restructure: pinned summary + panels --- */
-.cap-wrap{animation:cardIn .4s ease both;}
+.main.swap .cap-wrap{animation:cardIn .4s ease both;}
 .cap-titlebar{margin-bottom:20px;}
 .cap-titlebar h2{font-family:var(--serif); font-weight:600; font-size:27px; color:var(--text); margin-bottom:4px;}
 .cap-titlebar .sub{color:var(--muted); font-size:14px; line-height:1.6; max-width:78ch;}
@@ -1021,6 +1023,12 @@ details summary:hover{color:var(--purple2);}
 
 /* --- Page-swap entrance (framer-motion-style fade + slide) --- */
 @keyframes stepIn{from{opacity:0; transform:translateY(18px);} to{opacity:1; transform:none;}}
+
+/* --- Seamless in-place tab/scenario switching: crossfade only the changed
+       content (no full page re-render / re-animation) --- */
+.cap-panel, .climate-reactive{transition:opacity .16s ease;}
+.cap-panel.cap-fade, .climate-reactive.cap-fade{opacity:0;}
+.scenario-tab, .cap-tab{transition:color .16s ease, background .16s ease, border-color .16s ease;}
 
 /* --- React feature-carousel island section on the landing --- */
 .landing-carousel{position:relative; padding:26px clamp(20px,5vw,60px) 40px;}

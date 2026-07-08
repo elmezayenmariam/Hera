@@ -1006,7 +1006,27 @@ const CAP_TABS = [
   {id:'visual', label:'Visual Guidance & KB', ic:'image'}
 ];
 function capTabsHTML(){
-  return `<div class="cap-tabs">${CAP_TABS.map(t=>`<div class="cap-tab ${state.capTab===t.id?'active':''}" onclick="state.capTab='${t.id}';render()">${icon(t.ic,15)} ${t.label}</div>`).join('')}</div>`;
+  return `<div class="cap-tabs">${CAP_TABS.map(t=>`<div class="cap-tab ${state.capTab===t.id?'active':''}" data-tab="${t.id}" onclick="switchCapTab('${t.id}')">${icon(t.ic,15)} ${t.label}</div>`).join('')}</div>`;
+}
+function capPanelBody(tab, plan){
+  switch(tab){
+    case 'implementation': return capImplPanel(plan);
+    case 'cases': return capCasesGallery(plan);
+    case 'visual': return capVisualKBPanel(plan);
+    case 'strategy': default: return capStrategyPanel(plan);
+  }
+}
+/* Seamless ribbon switch: crossfade just the panel content in place instead of
+   re-rendering (and re-animating) the whole Action Plan page. */
+function switchCapTab(id){
+  if(state.capTab===id) return;
+  state.capTab = id;
+  document.querySelectorAll('.cap-tab[data-tab]').forEach(t=>t.classList.toggle('active', t.dataset.tab===id));
+  const panel = document.querySelector('.cap-panel');
+  if(!panel){ render(); return; }
+  const body = capPanelBody(id, buildActionPlan(state.scenario));
+  panel.classList.add('cap-fade');
+  setTimeout(()=>{ panel.innerHTML = body; panel.classList.remove('cap-fade'); }, 150);
 }
 function priorityColor(p){ return {Immediate:'var(--crit)', High:'var(--high)', Medium:'var(--mod)', Low:'var(--good)'}[p] || 'var(--muted)'; }
 function recCardHead(item){
@@ -1286,13 +1306,7 @@ function capViewer(){
 /* ---------- Router for the module ---------- */
 function pagePhase2(){
   const plan = buildActionPlan(state.scenario);
-  let body;
-  switch(state.capTab){
-    case 'implementation': body = capImplPanel(plan); break;
-    case 'cases': body = capCasesGallery(plan); break;
-    case 'visual': body = capVisualKBPanel(plan); break;
-    case 'strategy': default: body = capStrategyPanel(plan);
-  }
+  const body = capPanelBody(state.capTab, plan);
   return `<div class="cap-wrap">
     <div class="cap-titlebar">
       <div class="accentbar"></div>
@@ -2313,42 +2327,28 @@ function renderSolutionSection(sol){
   </div>`;
 }
 
-function pageClimate(){
+function computeScenarios(){
   const essR = computeESS(state.ess), bcsR = computeBCS(state.bcs), oisR = computeOIS(state.ois);
   const hriCurrent = computeHRI(essR.score, bcsR.score, oisR.score);
-
   const proj245 = projectScenario(state.ess, essR, bcsR.score, 'ssp245');
   const proj585 = projectScenario(state.ess, essR, bcsR.score, 'ssp585');
   const hri245 = computeHRI(proj245.ess, proj245.bcs, oisR.score);
   const hri585 = computeHRI(proj585.ess, proj585.bcs, oisR.score);
-
-  const scenarios = {
+  return {
     current: {label:'Current Conditions', ess:essR.score, bcs:bcsR.score, ois:oisR.score, hri:hriCurrent},
     ssp245:  {label:'SSP2-4.5 (Moderate)', ess:proj245.ess, bcs:proj245.bcs, ois:oisR.score, hri:hri245},
     ssp585:  {label:'SSP5-8.5 (Severe)',   ess:proj585.ess, bcs:proj585.bcs, ois:oisR.score, hri:hri585}
   };
+}
+/* Only the parts that react to the selected scenario (table highlight + decision
+   matrix). Swapped in place with a crossfade on scenario switch, no full render. */
+function climateReactiveHTML(){
+  const scenarios = computeScenarios();
   const sel = scenarios[state.scenario];
   const selCls = classify(sel.hri, HRI_TABLE);
   const drivers = dominantDrivers(sel.ess, sel.bcs, sel.ois);
   const strat = getStrategy(selCls.priority, drivers);
-
-  return `<div class="card">
-    <div class="accentbar"></div>
-    <h2>Climate Scenario Engine & Decision Matrix</h2>
-    <div class="sub">IPCC AR6 SSP pathways projected onto Current HRI to generate the Future HRI.</div>
-
-    <div class="indicator-block" style="margin-bottom:18px;">
-      <div class="ihead"><span class="iname">${icon('globe',16)} What is an SSP?</span></div>
-      <p style="font-size:13.5px;line-height:1.7;">
-        <b>SSP</b> stands for <b>Shared Socioeconomic Pathway</b>, one of the future-scenario narratives used by the <b>IPCC</b> (Intergovernmental Panel on Climate Change) in its <b>AR6</b> (Sixth Assessment Report, 2021–2023). The first number identifies the socioeconomic storyline (SSP2 = "Middle of the Road," SSP5 = "Fossil-fueled Development"); the number after the dash is the approximate radiative forcing by 2100 in W/m², higher means stronger warming. <b>SSP2-4.5</b> and <b>SSP5-8.5</b> are <b>independent, alternative futures, not sequential steps</b>, each is projected separately onto the same Current HRI baseline, so the three tabs below are parallel "what-if" branches rather than a single timeline.
-      </p>
-    </div>
-
-    <div class="scenario-tabs">
-      ${Object.keys(scenarios).map(k=>`<div class="scenario-tab ${state.scenario===k?'active':''}" onclick="state.scenario='${k}';render()">${scenarios[k].label}</div>`).join('')}
-    </div>
-
-    <table class="compare-table">
+  return `<table class="compare-table">
       <thead><tr><th>Scenario</th><th>ESS</th><th>BCS</th><th>OIS</th><th>HRI</th><th>Risk</th></tr></thead>
       <tbody>
         ${Object.keys(scenarios).map(k=>{
@@ -2369,7 +2369,38 @@ function pageClimate(){
         <div class="driver">Rule-based match: ${strat.key}</div>
         <p>${strat.text}</p>
       </div>
+    </div>`;
+}
+/* Seamless scenario switch: crossfade the reactive block instead of re-rendering
+   (and re-animating) the whole Climate Scenario page. */
+function switchScenario(key){
+  if(state.scenario===key) return;
+  state.scenario = key;
+  document.querySelectorAll('.scenario-tab[data-scn]').forEach(t=>t.classList.toggle('active', t.dataset.scn===key));
+  const el = document.getElementById('climateReactive');
+  if(!el){ render(); return; }
+  el.classList.add('cap-fade');
+  setTimeout(()=>{ el.innerHTML = climateReactiveHTML(); el.classList.remove('cap-fade'); }, 150);
+}
+function pageClimate(){
+  const scenarios = computeScenarios();
+  return `<div class="card">
+    <div class="accentbar"></div>
+    <h2>Climate Scenario Engine & Decision Matrix</h2>
+    <div class="sub">IPCC AR6 SSP pathways projected onto Current HRI to generate the Future HRI.</div>
+
+    <div class="indicator-block" style="margin-bottom:18px;">
+      <div class="ihead"><span class="iname">${icon('globe',16)} What is an SSP?</span></div>
+      <p style="font-size:13.5px;line-height:1.7;">
+        <b>SSP</b> stands for <b>Shared Socioeconomic Pathway</b>, one of the future-scenario narratives used by the <b>IPCC</b> (Intergovernmental Panel on Climate Change) in its <b>AR6</b> (Sixth Assessment Report, 2021–2023). The first number identifies the socioeconomic storyline (SSP2 = "Middle of the Road," SSP5 = "Fossil-fueled Development"); the number after the dash is the approximate radiative forcing by 2100 in W/m², higher means stronger warming. <b>SSP2-4.5</b> and <b>SSP5-8.5</b> are <b>independent, alternative futures, not sequential steps</b>, each is projected separately onto the same Current HRI baseline, so the three tabs below are parallel "what-if" branches rather than a single timeline.
+      </p>
     </div>
+
+    <div class="scenario-tabs">
+      ${Object.keys(scenarios).map(k=>`<div class="scenario-tab ${state.scenario===k?'active':''}" data-scn="${k}" onclick="switchScenario('${k}')">${scenarios[k].label}</div>`).join('')}
+    </div>
+
+    <div id="climateReactive" class="climate-reactive">${climateReactiveHTML()}</div>
 
     <div class="note">This category and dominant driver, for the scenario selected above, is what feeds the <b>Conservation Strategy</b> step next, continue to generate a fully tailored, source-cited action plan.</div>
   </div>${navRow(5,7)}`;
@@ -2516,7 +2547,8 @@ Object.assign(window, {
   addBuildingImages, removeBuildingImage,
   stripHoverStart, stripHoverStop, stripStep,
   openWorkflow, closeWorkflow, openCaseStudy, closeCaseStudy, openFuture, closeFuture,
-  caseGalleryNav, caseGalleryAutoStart, caseGalleryAutoStop
+  caseGalleryNav, caseGalleryAutoStart, caseGalleryAutoStop,
+  switchCapTab, switchScenario
 });
 /* ============================== CONNECTIVITY ============================== */
 loadImageCache(); // populate state.imageCache from localStorage, if available, degrades gracefully if not
