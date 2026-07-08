@@ -213,11 +213,11 @@ function FeatureCard({ children, step }: { children: React.ReactNode; step: numb
       style={{ "--x": useMotionTemplate`${mouseX}px`, "--y": useMotionTemplate`${mouseY}px` } as WrapperStyle}
     >
       <div className="relative w-full overflow-hidden rounded-3xl border border-[#DBC9AC] bg-[#FBF6EC] transition-colors duration-300">
-        <div className="m-6 sm:m-10 min-h-[420px] w-full">
+        <div className="grid items-center gap-6 p-6 sm:p-9 md:grid-cols-2 md:gap-9">
           <AnimatePresence mode="wait">
             <motion.div
               key={step}
-              className="flex w-full flex-col gap-4 md:w-3/5"
+              className="flex w-full flex-col gap-4"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
@@ -251,7 +251,7 @@ function FeatureCard({ children, step }: { children: React.ReactNode; step: numb
               </motion.div>
             </motion.div>
           </AnimatePresence>
-          {children}
+          <div className="relative w-full">{children}</div>
         </div>
       </div>
     </motion.div>
@@ -299,70 +299,39 @@ function StepsNav({ steps: stepItems, current, onChange }: { steps: readonly Ste
   )
 }
 
-const defaultClasses = {
-  img: "rounded-xl border border-[#DBC9AC] shadow-2xl shadow-black/10 object-cover",
-  step1img1: "w-[50%] left-0 top-[12%]",
-  step1img2: "w-[58%] left-[40%] top-[36%]",
-  step2img1: "w-[50%] left-[3%] top-[16%]",
-  step2img2: "w-[52%] left-[46%] top-[42%]",
-  step3img1: "w-[50%] left-[3%] top-[16%]",
-  step3img2: "w-[52%] left-[46%] top-[42%]",
-  step4img1: "w-[50%] left-[3%] top-[16%]",
-  step4img2: "w-[52%] left-[46%] top-[42%]",
-} as const
-
-export function FeatureCarousel({
-  image,
-  step1img1Class = defaultClasses.step1img1,
-  step1img2Class = defaultClasses.step1img2,
-  step2img1Class = defaultClasses.step2img1,
-  step2img2Class = defaultClasses.step2img2,
-  step3img1Class = defaultClasses.step3img1,
-  step3img2Class = defaultClasses.step3img2,
-  step4img1Class = defaultClasses.step4img1,
-  step4img2Class = defaultClasses.step4img2,
-  ...props
-}: FeatureCarouselProps) {
+export function FeatureCarousel({ image, ...props }: FeatureCarouselProps) {
   const { currentNumber: step, setStep } = useNumberCycler()
+  // Two reference photos per step, shown fully (object-cover, no clipping/overlap).
+  const stepImages: [StaticImageData, StaticImageData][] = [
+    [image.step1img1, image.step1img2],
+    [image.step2img1, image.step2img2],
+    [image.step3img1, image.step3img2],
+    [image.step4img1, image.step4img2],
+  ]
   const renderStepContent = () => {
-    switch (step) {
-      case 0:
-        return (
-          <div className="relative w-full h-full">
-            <AnimatedStepImage alt={image.alt} className={cn(defaultClasses.img, step1img1Class)} src={image.step1img1} preset="slideInLeft" />
-            <AnimatedStepImage alt={image.alt} className={cn(defaultClasses.img, step1img2Class)} src={image.step1img2} preset="slideInRight" delay={0.1} />
-          </div>
-        )
-      case 1:
-        return (
-          <div className="relative w-full h-full">
-            <AnimatedStepImage alt={image.alt} className={cn(defaultClasses.img, step2img1Class)} src={image.step2img1} preset="slideInLeft" />
-            <AnimatedStepImage alt={image.alt} className={cn(defaultClasses.img, step2img2Class)} src={image.step2img2} preset="slideInRight" delay={0.1} />
-          </div>
-        )
-      case 2:
-        return (
-          <div className="relative w-full h-full">
-            <AnimatedStepImage alt={image.alt} className={cn(defaultClasses.img, step3img1Class)} src={image.step3img1} preset="slideInLeft" />
-            <AnimatedStepImage alt={image.alt} className={cn(defaultClasses.img, step3img2Class)} src={image.step3img2} preset="slideInRight" delay={0.1} />
-          </div>
-        )
-      case 3:
-        return (
-          <div className="relative w-full h-full">
-            <AnimatedStepImage alt={image.alt} className={cn(defaultClasses.img, step4img1Class)} src={image.step4img1} preset="slideInLeft" />
-            <AnimatedStepImage alt={image.alt} className={cn(defaultClasses.img, step4img2Class)} src={image.step4img2} preset="slideInRight" delay={0.1} />
-          </div>
-        )
-      default:
-        return null
-    }
+    const pair = stepImages[step] || stepImages[0]
+    return (
+      <div className="flex flex-col gap-3.5">
+        {pair.map((src, i) => (
+          <motion.img
+            key={src + i}
+            src={src}
+            alt={image.alt}
+            initial={{ opacity: 0, x: i === 0 ? -18 : 18 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.05 + i * 0.1, duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+            onError={(e) => { e.currentTarget.style.display = "none" }}
+            className="w-full h-40 sm:h-44 object-cover rounded-xl border border-[#DBC9AC] shadow-xl shadow-black/10"
+          />
+        ))}
+      </div>
+    )
   }
   return (
-    <div className="flex flex-col gap-10 w-full max-w-4xl mx-auto p-0">
+    <div className="flex flex-col gap-8 w-full max-w-4xl mx-auto p-0">
       <FeatureCard {...props} step={step}>
         <AnimatePresence mode="wait">
-          <motion.div key={step} {...ANIMATION_PRESETS.fadeInScale} className="w-full h-full absolute">
+          <motion.div key={step} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.3 }} className="w-full">
             {renderStepContent()}
           </motion.div>
         </AnimatePresence>

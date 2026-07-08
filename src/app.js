@@ -894,7 +894,7 @@ function retrieveMedia(tags, topN){
    Results are cached (in-memory + localStorage) so the same query is never
    re-fetched needlessly, and the app still functions with no connection, 
    getImages() just returns a graceful "offline" status the UI can render. */
-const IMAGE_CACHE_KEY = 'hera_image_cache_v1';
+const IMAGE_CACHE_KEY = 'hera_image_cache_v2';   // v2: 800px thumbs (was 480)
 const IMAGE_CACHE_TTL_MS = 30*24*60*60*1000; // 30 days
 
 function loadImageCache(){
@@ -915,7 +915,7 @@ function imageCacheKey(query){ return 'img:'+query.toLowerCase().trim(); }
 
 async function searchWikimediaImages(query, maxN){
   maxN = maxN || 3;
-  const url = `https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrsearch=${encodeURIComponent(query+' filetype:bitmap')}&gsrlimit=${maxN}&gsrnamespace=6&prop=imageinfo&iiprop=url|extmetadata&iiurlwidth=480&format=json&origin=*`;
+  const url = `https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrsearch=${encodeURIComponent(query+' filetype:bitmap')}&gsrlimit=${maxN}&gsrnamespace=6&prop=imageinfo&iiprop=url|extmetadata&iiurlwidth=800&format=json&origin=*`;
   const data = await fetchJSON(url, {timeoutMs:9000});
   const pages = data && data.query && data.query.pages ? Object.values(data.query.pages) : [];
   return pages
@@ -1149,11 +1149,29 @@ function capVisual(plan){
         <div style="margin-top:14px;">
           ${localMedia.length
             ? `<div style="display:flex;gap:12px;flex-wrap:wrap;">${localMedia.map(m=>`<div style="cursor:pointer;" onclick="openCapModal('${m.id}')">${mediaPlaceholder(m.caption)}</div>`).join('')}</div>`
-            : imageResultsHTML(query, 3, 'No matching images found for this recommendation')}
+            : vgImagesHTML(query)}
         </div>
       </div>`;
     }).join('')}
   `;
+}
+
+/* Visual-guidance image row: full pictures side by side, caption always visible,
+   source/license subtitle revealed on hover, whole tile links to the original. */
+function vgImagesHTML(query){
+  const entry = getImages(query, 3);
+  if(entry.status==='loading') return `<div class="media-placeholder"><div class="media-placeholder-icon">${icon('search',26)}</div><div class="media-placeholder-text">Searching Wikimedia Commons…</div></div>`;
+  if(entry.status==='offline') return `<div class="media-placeholder"><div class="media-placeholder-icon">${icon('wifiOff',26)}</div><div class="media-placeholder-text">Offline. Connect to load images.</div></div>`;
+  if(entry.status==='error') return `<div class="media-placeholder"><div class="media-placeholder-icon">${icon('alert',26)}</div><div class="media-placeholder-text">${entry.error}</div></div><button class="cg-retry" onclick='retryImages(${JSON.stringify(query)},3)'>${icon('refresh',14)} Retry</button>`;
+  if(entry.status==='empty' || !entry.images.length) return mediaPlaceholder('No matching images found for this recommendation');
+  return `<div class="vg-imgs">${entry.images.map(img=>`
+    <a class="vg-img" href="${img.descriptionUrl}" target="_blank" rel="noopener noreferrer" title="Open original on Wikimedia Commons">
+      <span class="vg-media"><img src="${img.thumbUrl}" alt="${(img.title||'').replace(/"/g,'&quot;')}" loading="lazy" onerror="this.closest('.vg-img').style.display='none'"></span>
+      <span class="vg-cap">
+        <span class="vg-title">${img.title}</span>
+        <span class="vg-sub">${img.source} · ${img.license} · Open original →</span>
+      </span>
+    </a>`).join('')}</div>`;
 }
 
 /* ---------- Tab 4 · Related Case Studies ---------- */
@@ -1603,24 +1621,38 @@ function capCasesGallery(plan){
     <div class="gal-foot">Comparators for framework transferability across adaptive-reuse heritage buildings of the 1880–1940 period. Photographs retrieved live from Wikimedia Commons, no AI-generated imagery. Sources: ${CASE_STUDY_CITATIONS}.</div>`;
 }
 
-/* ---------- Case-study photo gallery (title + subtitle under each image) ---------- */
+/* ---------- Case-study photo gallery: auto-advancing carousel with glass nav ---------- */
 function caseGalleryHTML(query, cs){
   const entry = getImages(query, 6);
   if(entry.status==='loading') return `<div class="media-placeholder"><div class="media-placeholder-icon">${icon('search',26)}</div><div class="media-placeholder-text">Searching Wikimedia Commons for photographs…</div></div>`;
   if(entry.status==='offline') return `<div class="media-placeholder"><div class="media-placeholder-icon">${icon('wifiOff',26)}</div><div class="media-placeholder-text">Offline. Connect to the internet to load photographs.</div></div>`;
   if(entry.status==='error') return `<div class="media-placeholder"><div class="media-placeholder-icon">${icon('alert',26)}</div><div class="media-placeholder-text">${entry.error}</div></div><button class="cg-retry" onclick='retryImages(${JSON.stringify(query)},6)'>${icon('refresh',14)} Retry</button>`;
   if(entry.status==='empty' || !entry.images.length) return `<div class="media-placeholder"><div class="media-placeholder-icon">${icon('image',26)}</div><div class="media-placeholder-text">No photographs found on Wikimedia Commons for ${cs.name}.</div></div>`;
-  return `<div class="cg-grid">${entry.images.map(img=>`
-    <figure class="cg-item">
-      <a class="cg-thumb" href="${img.descriptionUrl}" target="_blank" rel="noopener noreferrer" title="View original on Wikimedia Commons">
-        <img src="${img.thumbUrl}" alt="${(img.title||'').replace(/"/g,'&quot;')}" loading="lazy" onerror="this.closest('.cg-item').style.display='none'">
+  const slides = entry.images.map(img=>`
+    <figure class="cg-slide">
+      <a class="cg-slide-media" href="${img.descriptionUrl}" target="_blank" rel="noopener noreferrer" title="Open original on Wikimedia Commons">
+        <img src="${img.thumbUrl}" alt="${(img.title||'').replace(/"/g,'&quot;')}" loading="lazy" onerror="this.closest('.cg-slide').style.display='none'">
       </a>
-      <figcaption>
-        <span class="cg-title">${img.title}</span>
-        <span class="cg-sub">${img.source} · ${img.license}</span>
-      </figcaption>
-    </figure>`).join('')}</div>`;
+      <figcaption><span class="cg-title">${img.title}</span><span class="cg-sub">${img.source} · ${img.license}</span></figcaption>
+    </figure>`).join('');
+  return `<div class="cg-carousel" onmouseenter="caseGalleryAutoStop()" onmouseleave="caseGalleryAutoStart()">
+    <div class="cg-track" id="caseTrack">${slides}</div>
+    ${entry.images.length>1 ? `
+      <button class="cg-nav cg-prev" onclick="caseGalleryNav(-1)" aria-label="Previous image">${icon('arrowLeft',20)}</button>
+      <button class="cg-nav cg-next" onclick="caseGalleryNav(1)" aria-label="Next image">${icon('arrowRight',20)}</button>` : ''}
+  </div>`;
 }
+let _caseTimer = null;
+function caseGalleryNav(dir){
+  const el = document.getElementById('caseTrack'); if(!el) return;
+  const atEnd = dir>0 && el.scrollLeft + el.clientWidth >= el.scrollWidth - 6;
+  const atStart = dir<0 && el.scrollLeft <= 6;
+  if(atEnd) el.scrollTo({left:0, behavior:'smooth'});
+  else if(atStart) el.scrollTo({left:el.scrollWidth, behavior:'smooth'});
+  else el.scrollBy({left:dir*el.clientWidth, behavior:'smooth'});
+}
+function caseGalleryAutoStart(){ caseGalleryAutoStop(); _caseTimer = setInterval(()=>caseGalleryNav(1), 3800); }
+function caseGalleryAutoStop(){ if(_caseTimer){ clearInterval(_caseTimer); _caseTimer = null; } }
 
 /* ---------- Case-study detail modal (pictures + data) ---------- */
 function caseStudyModalHTML(){
@@ -1655,8 +1687,8 @@ function caseStudyModalHTML(){
     </div>
   </div>`;
 }
-function openCaseStudy(id){ state.caseModalId = id; const cs = findCaseStudy(id); if(cs) getImages(csImgQuery(cs), 6); render(); }
-function closeCaseStudy(){ state.caseModalId = null; render(); }
+function openCaseStudy(id){ state.caseModalId = id; const cs = findCaseStudy(id); if(cs) getImages(csImgQuery(cs), 6); render(); caseGalleryAutoStart(); }
+function closeCaseStudy(){ state.caseModalId = null; caseGalleryAutoStop(); render(); }
 
 /* ---------- Scroll-reveal observer (landing) ---------- */
 let _revealObs = null;
@@ -2480,7 +2512,8 @@ Object.assign(window, {
   openPillar, closePillar, startAssessment,
   addBuildingImages, removeBuildingImage,
   stripHoverStart, stripHoverStop, stripStep,
-  openWorkflow, closeWorkflow, openCaseStudy, closeCaseStudy, openFuture, closeFuture
+  openWorkflow, closeWorkflow, openCaseStudy, closeCaseStudy, openFuture, closeFuture,
+  caseGalleryNav, caseGalleryAutoStart, caseGalleryAutoStop
 });
 /* ============================== CONNECTIVITY ============================== */
 loadImageCache(); // populate state.imageCache from localStorage, if available, degrades gracefully if not
