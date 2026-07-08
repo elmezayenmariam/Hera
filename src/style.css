@@ -582,20 +582,35 @@ details summary:hover{color:var(--purple2);}
 .landing-intro{background:var(--bg2); border-bottom:1px solid var(--border); padding:clamp(70px,12vh,140px) clamp(20px,4vw,52px); text-align:center;}
 .intro-wrap{max-width:780px; margin:0 auto; display:flex; flex-direction:column; align-items:center;}
 
-/* --- Art Nouveau frame around the intro (corner ornaments + double border).
-       The corners are fixed-aspect SVGs that scale via clamp(); the plain border
-       between them stretches, so the frame adapts from desktop to phone without
-       distorting the artwork. --- */
-.ornate-frame{position:relative; max-width:960px; margin:0 auto;
-  padding:clamp(52px,9vw,88px) clamp(34px,8vw,80px);
+/* --- Art Nouveau frame around the intro (corner ornaments + mid-edge motifs
+       + double border). Fixed-aspect SVG pieces scale via clamp() while the
+       plain border between them stretches, so the frame spans the full page
+       width on desktop (aligned to the same gutters as the nav/hero) and
+       adapts down to phone without distorting the artwork. --- */
+.ornate-frame{position:relative; margin:0 auto;
+  padding:clamp(56px,10vw,96px) clamp(38px,8vw,90px);
   border:1.5px solid rgba(176,83,42,.35); border-radius:10px;}
 .ornate-frame::before{content:""; position:absolute; inset:7px; border:1px solid rgba(176,83,42,.16); border-radius:6px; pointer-events:none;}
-.of-corner{position:absolute; width:clamp(60px,13vw,138px); line-height:0; pointer-events:none;}
+.of-corner{position:absolute; width:clamp(70px,14vw,170px); line-height:0; pointer-events:none;}
 .of-corner svg{width:100%; height:auto; display:block;}
-.of-corner.tl{top:-9px; left:-9px;}
-.of-corner.tr{top:-9px; right:-9px; transform:scaleX(-1);}
-.of-corner.bl{bottom:-9px; left:-9px; transform:scaleY(-1);}
-.of-corner.br{bottom:-9px; right:-9px; transform:scale(-1,-1);}
+.of-corner.tl{top:-10px; left:-10px;}
+.of-corner.tr{top:-10px; right:-10px; transform:scaleX(-1);}
+.of-corner.bl{bottom:-10px; left:-10px; transform:scaleY(-1);}
+.of-corner.br{bottom:-10px; right:-10px; transform:scale(-1,-1);}
+/* palmette centered on the top/bottom border */
+.of-edge{position:absolute; left:50%; width:clamp(140px,20vw,240px); line-height:0; pointer-events:none;}
+.of-edge svg{width:100%; height:auto; display:block;}
+.of-edge.top{top:-14px; transform:translateX(-50%);}
+.of-edge.bottom{bottom:-14px; transform:translateX(-50%) scaleY(-1);}
+/* leaf sprig centered on the left/right border */
+.of-side{position:absolute; top:50%; width:clamp(36px,4vw,58px); line-height:0; pointer-events:none;}
+.of-side svg{width:100%; height:auto; display:block;}
+.of-side.left{left:-11px; transform:translateY(-50%);}
+.of-side.right{right:-11px; transform:translateY(-50%) scaleX(-1);}
+@media(max-width:700px){
+  .of-side{display:none;}            /* short phone edges: corners + palmettes suffice */
+  .of-edge{width:clamp(110px,32vw,160px);}
+}
 .intro-wrap .eyebrow{margin-bottom:18px;}
 .intro-wrap h2{font-family:var(--serif); font-weight:500; font-size:clamp(30px,4.6vw,52px); line-height:1.08; letter-spacing:-.02em; color:var(--text); margin-bottom:22px;}
 .intro-wrap h2 em{font-style:italic; color:var(--purple);}

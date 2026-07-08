@@ -1871,21 +1871,58 @@ function removeProject(id){
    while the plain double border between them stretches. Muted teal + ochre leaf
    fills echo the Art Nouveau reference artwork. */
 function ornamentCorner(){
-  return `<svg viewBox="0 0 150 150" fill="none" aria-hidden="true">
-    <path d="M150 10 C104 5 58 7 34 18 C18 25 10 40 13 57" stroke="var(--purple)" stroke-width="2.4" stroke-linecap="round" opacity=".85"/>
-    <path d="M10 150 C5 104 7 58 18 34" stroke="var(--purple)" stroke-width="2.4" stroke-linecap="round" opacity=".85"/>
-    <path d="M13 57 C16 71 31 76 39 66 C46 58 39 47 30 50 C24 52 23 59 28 62" stroke="var(--purple)" stroke-width="2.1" stroke-linecap="round" opacity=".8"/>
-    <path d="M70 9 C64 21 72 31 84 28 C93 26 94 15 86 13" stroke="var(--purple)" stroke-width="1.9" stroke-linecap="round" opacity=".65"/>
-    <path d="M9 70 C21 64 31 72 28 84 C26 93 15 94 13 86" stroke="var(--purple)" stroke-width="1.9" stroke-linecap="round" opacity=".65"/>
-    <path d="M96 10 C106 1 124 0 136 6 C126 17 108 19 96 10 Z" fill="#5E8073" opacity=".85"/>
-    <path d="M52 16 C58 5 72 0 82 4 C76 14 62 20 52 16 Z" fill="#7FA192" opacity=".85"/>
-    <path d="M10 96 C1 106 0 124 6 136 C17 126 19 108 10 96 Z" fill="#5E8073" opacity=".85"/>
-    <path d="M16 52 C5 58 0 72 4 82 C14 76 20 62 16 52 Z" fill="#7FA192" opacity=".85"/>
-    <path d="M34 30 C40 22 52 20 58 25 C52 33 40 36 34 30 Z" fill="#C4703C" opacity=".9"/>
-    <path d="M30 34 C22 40 20 52 25 58 C33 52 36 40 30 34 Z" fill="var(--mod)" opacity=".85"/>
-    <circle cx="90" cy="20" r="3" fill="var(--purple)" opacity=".8"/>
-    <circle cx="20" cy="90" r="3" fill="var(--purple)" opacity=".8"/>
-    <circle cx="45" cy="45" r="2.6" fill="var(--mod)" opacity=".9"/>
+  return `<svg viewBox="0 0 200 200" fill="none" aria-hidden="true">
+    <path d="M200 12 C150 6 96 8 62 16 C34 22 16 38 14 62" stroke="var(--purple)" stroke-width="2.6" stroke-linecap="round" opacity=".85"/>
+    <path d="M12 200 C6 150 8 96 16 62" stroke="var(--purple)" stroke-width="2.6" stroke-linecap="round" opacity=".85"/>
+    <path d="M14 62 C18 80 38 86 48 74 C56 64 48 50 36 54 C28 57 27 66 33 69" stroke="var(--purple)" stroke-width="2.2" stroke-linecap="round" opacity=".8"/>
+    <path d="M96 10 C88 26 100 40 116 36 C128 33 129 18 118 16" stroke="var(--purple)" stroke-width="2" stroke-linecap="round" opacity=".7"/>
+    <path d="M10 96 C26 88 40 100 36 116 C33 128 18 129 16 118" stroke="var(--purple)" stroke-width="2" stroke-linecap="round" opacity=".7"/>
+    <path d="M150 9 C146 18 152 26 162 24" stroke="var(--purple)" stroke-width="1.7" stroke-linecap="round" opacity=".55"/>
+    <path d="M9 150 C18 146 26 152 24 162" stroke="var(--purple)" stroke-width="1.7" stroke-linecap="round" opacity=".55"/>
+    <path d="M52 34 C62 22 80 20 88 28 C80 40 62 44 52 34 Z" fill="#C4703C" opacity=".9"/>
+    <path d="M34 52 C22 62 20 80 28 88 C40 80 44 62 34 52 Z" fill="#C4703C" opacity=".9"/>
+    <path d="M50 50 C58 40 74 38 82 46 C72 54 58 58 50 50 Z" fill="var(--mod)" opacity=".85"/>
+    <path d="M50 50 C40 58 38 74 46 82 C54 72 58 58 50 50 Z" fill="var(--mod)" opacity=".85"/>
+    <circle cx="52" cy="52" r="7" fill="var(--purple)" opacity=".9"/>
+    <circle cx="52" cy="52" r="3" fill="#F1E7D6"/>
+    <path d="M120 12 C132 2 152 1 166 7 C154 19 132 21 120 12 Z" fill="#5E8073" opacity=".88"/>
+    <path d="M76 16 C84 4 100 0 112 5 C104 16 88 22 76 16 Z" fill="#7FA192" opacity=".88"/>
+    <path d="M12 120 C2 132 1 152 7 166 C19 154 21 132 12 120 Z" fill="#5E8073" opacity=".88"/>
+    <path d="M16 76 C4 84 0 100 5 112 C16 104 22 88 16 76 Z" fill="#7FA192" opacity=".88"/>
+    <path d="M138 26 C142 18 150 18 154 24 C150 32 142 32 138 26 Z" fill="#C97B4A" opacity=".9"/>
+    <path d="M26 138 C18 142 18 150 24 154 C32 150 32 142 26 138 Z" fill="#C97B4A" opacity=".9"/>
+    <circle cx="104" cy="22" r="3" fill="var(--purple)" opacity=".8"/>
+    <circle cx="22" cy="104" r="3" fill="var(--purple)" opacity=".8"/>
+    <circle cx="66" cy="66" r="2.6" fill="var(--mod)" opacity=".9"/>
+    <circle cx="176" cy="14" r="2.2" fill="var(--mod)" opacity=".75"/>
+    <circle cx="14" cy="176" r="2.2" fill="var(--mod)" opacity=".75"/>
+  </svg>`;
+}
+/* Symmetric palmette centered on the top/bottom border (mirrored for bottom). */
+function ornamentEdge(){
+  return `<svg viewBox="0 0 240 80" fill="none" aria-hidden="true">
+    <path d="M120 14 C112 26 112 40 120 50 C128 40 128 26 120 14 Z" fill="var(--purple)" opacity=".88"/>
+    <path d="M120 44 C104 30 84 26 64 32 C56 34 52 42 58 46" stroke="var(--purple)" stroke-width="2" stroke-linecap="round" opacity=".75"/>
+    <path d="M120 44 C136 30 156 26 176 32 C184 34 188 42 182 46" stroke="var(--purple)" stroke-width="2" stroke-linecap="round" opacity=".75"/>
+    <path d="M84 28 C74 18 58 16 46 22 C56 32 72 36 84 28 Z" fill="#5E8073" opacity=".85"/>
+    <path d="M156 28 C166 18 182 16 194 22 C184 32 168 36 156 28 Z" fill="#5E8073" opacity=".85"/>
+    <path d="M98 22 C92 12 80 8 70 11 C76 21 88 26 98 22 Z" fill="#7FA192" opacity=".85"/>
+    <path d="M142 22 C148 12 160 8 170 11 C164 21 152 26 142 22 Z" fill="#7FA192" opacity=".85"/>
+    <circle cx="98" cy="34" r="2.6" fill="var(--mod)" opacity=".9"/>
+    <circle cx="142" cy="34" r="2.6" fill="var(--mod)" opacity=".9"/>
+    <circle cx="120" cy="58" r="3" fill="#C4703C" opacity=".9"/>
+  </svg>`;
+}
+/* Vertical leaf sprig centered on the left/right border (mirrored for right). */
+function ornamentSide(){
+  return `<svg viewBox="0 0 70 200" fill="none" aria-hidden="true">
+    <path d="M34 8 C26 40 26 70 34 100 C42 130 42 160 34 192" stroke="var(--purple)" stroke-width="2" stroke-linecap="round" opacity=".75"/>
+    <path d="M34 52 C44 42 60 40 68 46 C60 56 44 60 34 52 Z" fill="#5E8073" opacity=".85"/>
+    <path d="M34 148 C44 138 60 136 68 142 C60 152 44 156 34 148 Z" fill="#7FA192" opacity=".85"/>
+    <path d="M34 100 m-7 0 a7 7 0 1 0 14 0 a7 7 0 1 0 -14 0" fill="#C4703C" opacity=".9"/>
+    <circle cx="34" cy="100" r="2.6" fill="#F1E7D6"/>
+    <circle cx="44" cy="74" r="2.4" fill="var(--mod)" opacity=".85"/>
+    <circle cx="44" cy="126" r="2.4" fill="var(--mod)" opacity=".85"/>
   </svg>`;
 }
 
@@ -1953,6 +1990,10 @@ function pageHome(){
         <span class="of-corner tr" aria-hidden="true">${ornamentCorner()}</span>
         <span class="of-corner bl" aria-hidden="true">${ornamentCorner()}</span>
         <span class="of-corner br" aria-hidden="true">${ornamentCorner()}</span>
+        <span class="of-edge top" aria-hidden="true">${ornamentEdge()}</span>
+        <span class="of-edge bottom" aria-hidden="true">${ornamentEdge()}</span>
+        <span class="of-side left" aria-hidden="true">${ornamentSide()}</span>
+        <span class="of-side right" aria-hidden="true">${ornamentSide()}</span>
         <div class="intro-wrap">
           <span class="eyebrow">What is HERA</span>
           <h2 id="twTarget" class="tw"><span class="tw-type"></span><span class="tw-caret"></span></h2>
