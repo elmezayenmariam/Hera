@@ -420,10 +420,19 @@ button.primary:disabled{background:var(--muted); border-color:var(--muted);}
 /* ==========================================================================
    CONSERVATION ACTION PLAN
    ========================================================================== */
-.cap-tabs{display:flex; gap:4px; flex-wrap:wrap; margin:18px 0 22px; border-bottom:1px solid var(--border); padding-bottom:0;}
-.cap-tab{padding:10px 14px; font-size:13px; font-weight:600; color:var(--muted); cursor:pointer; border-bottom:2px solid transparent; margin-bottom:-1px; border-radius:8px 8px 0 0; transition:.16s;}
+/* Tabs stretch equally to fill the panel width (no gap on the right). */
+.cap-tabs{display:flex; gap:4px; margin:18px 0 22px; border-bottom:1px solid var(--border); padding-bottom:0;}
+.cap-tab{flex:1 1 0; min-width:0; display:inline-flex; align-items:center; justify-content:center; gap:7px; text-align:center;
+  padding:11px 12px; font-size:13px; font-weight:600; color:var(--muted); cursor:pointer; white-space:nowrap;
+  border-bottom:2px solid transparent; margin-bottom:-1px; border-radius:8px 8px 0 0; transition:.16s;}
+.cap-tab svg{flex:0 0 auto;}
 .cap-tab.active{color:var(--purple2); border-bottom-color:var(--purple); background:var(--accent-tint);}
 .cap-tab:hover{color:var(--text);}
+@media(max-width:640px){
+  .cap-tabs{overflow-x:auto; scrollbar-width:none;}
+  .cap-tabs::-webkit-scrollbar{display:none;}
+  .cap-tab{flex:0 0 auto;}
+}
 
 .rec-card{border:1px solid var(--border); border-radius:var(--r-md); padding:20px 22px; margin-bottom:16px; background:var(--surface); box-shadow:var(--sh-1); transition:box-shadow .18s ease, transform .18s ease;}
 .rec-card:hover{box-shadow:var(--sh-2);}
@@ -816,8 +825,11 @@ details summary:hover{color:var(--purple2);}
 .gal-card:focus-visible{outline:2px solid var(--purple); outline-offset:3px; border-radius:var(--r-lg);}
 .gal-media{position:relative; height:384px; border-radius:var(--r-lg); overflow:hidden; box-shadow:var(--sh-2); transition:transform .22s ease, box-shadow .22s ease;}
 .gal-card:hover .gal-media{transform:translateY(-4px); box-shadow:var(--sh-3);}
-.gal-media img{position:absolute; inset:0; width:100%; height:100%; object-fit:cover; transition:transform .45s ease;}
-.gal-card:hover .gal-media img{transform:scale(1.06);}
+/* Slight base zoom so the black scanner matte baked into archival postcard/photo
+   scans (e.g. the Heliopolis Palace Hotel postcard) is cropped out rather than
+   showing as a black band at the top/bottom of the portrait card. */
+.gal-media img{position:absolute; inset:0; width:100%; height:100%; object-fit:cover; object-position:center; transform:scale(1.14); transition:transform .45s ease;}
+.gal-card:hover .gal-media img{transform:scale(1.2);}
 .gal-ph{position:absolute; inset:0; display:grid; place-items:center; color:var(--border-strong); background:var(--bg3);}
 /* Stronger, taller scrim so the caption text reads clearly over any photo. */
 .gal-scrim{position:absolute; inset:0; background:linear-gradient(transparent 4%, rgba(35,20,9,.35) 34%, rgba(30,17,8,.78) 66%, rgba(24,13,6,.95));}

@@ -1694,7 +1694,10 @@ function closeCaseStudy(){ state.caseModalId = null; caseGalleryAutoStop(); rend
 let _revealObs = null;
 function setupReveals(){
   if(_revealObs) _revealObs.disconnect();
-  const els = document.querySelectorAll('.reveal');
+  // Also observe .tw-after (the intro paragraph + Start Assessment button): they
+  // reveal on scroll-into-view here, independent of the typewriter finishing, so
+  // the button can never stay stuck invisible/faded when you go to click it.
+  const els = document.querySelectorAll('.reveal, .tw-after');
   if(!els.length || typeof IntersectionObserver === 'undefined'){ els.forEach(el=>el.classList.add('in')); return; }
   _revealObs = new IntersectionObserver((entries)=>{
     entries.forEach(e=>{ if(e.isIntersecting){ e.target.classList.add('in'); _revealObs.unobserve(e.target); } });
