@@ -1,6 +1,6 @@
 // Entry point. Vite bundles this as an ES module.
 // The rest of the app (app.js) still builds its UI as innerHTML strings with
-// inline onclick/oninput/onchange attributes — exactly as the original
+// inline onclick/oninput/onchange attributes, exactly as the original
 // single-file prototype did. Inline handlers are resolved against `window`,
 // not module scope, so every function/name referenced from an inline handler
 // in the generated HTML has to be attached to window here. This is the only

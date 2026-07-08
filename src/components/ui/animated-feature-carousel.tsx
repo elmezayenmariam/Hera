@@ -35,8 +35,10 @@ interface ImageSet {
   step1img2: StaticImageData
   step2img1: StaticImageData
   step2img2: StaticImageData
-  step3img: StaticImageData
-  step4img: StaticImageData
+  step3img1: StaticImageData
+  step3img2: StaticImageData
+  step4img1: StaticImageData
+  step4img2: StaticImageData
   alt: string
 }
 interface FeatureCarouselProps extends CardProps {
@@ -44,8 +46,10 @@ interface FeatureCarouselProps extends CardProps {
   step1img2Class?: string
   step2img1Class?: string
   step2img2Class?: string
-  step3imgClass?: string
-  step4imgClass?: string
+  step3img1Class?: string
+  step3img2Class?: string
+  step4img1Class?: string
+  step4img2Class?: string
   image: ImageSet
 }
 interface StepImageProps {
@@ -66,34 +70,37 @@ interface Step {
 // --- Constants ---
 // Retitled from the generic demo to HERA's own four-measure assessment workflow.
 const TOTAL_STEPS = 4
+// The carousel explains the LOGIC behind each assessment (why it exists and what
+// it contributes to the risk model), rather than restating the measure definitions
+// shown in the framework grid.
 const steps: readonly Step[] = [
   {
     id: "1",
     name: "Environment",
-    title: "Environmental Stress (ESS)",
+    title: "Why environmental stress?",
     description:
-      "Auto-retrieve live temperature, humidity and solar radiation for the building's exact location — or enter readings by hand. This is the climate load acting on the historic fabric.",
+      "Risk begins with the hazard. HERA reads the climate load acting on the fabric, temperature, humidity and solar radiation, pulled live for the building's exact coordinates. This same baseline is what the IPCC climate scenarios later shift to project the future.",
   },
   {
     id: "2",
     name: "Condition",
-    title: "Building Condition (BCS)",
+    title: "Why building condition?",
     description:
-      "Record material decay, cracking, surface loss and biological growth to gauge how vulnerable the fabric already is — the building's structural susceptibility.",
+      "The same climate harms a sound building far less than a failing one. Condition captures how vulnerable the fabric already is, decay, cracking, surface loss and biological growth, so identical hazards translate into very different risk.",
   },
   {
     id: "3",
     name: "Occupancy",
-    title: "Occupancy Impact (OIS)",
+    title: "Why occupancy impact?",
     description:
-      "Capture visitor density, load and event frequency — the operational pressure that adaptive reuse places on a heritage building day to day.",
+      "Adaptive reuse adds exposure. Putting a heritage building back into service brings visitors, loading and events, an operational pressure that compounds climate and condition risk rather than sitting apart from it.",
   },
   {
     id: "4",
     name: "Future HRI",
-    title: "Future Heritage Risk Index",
+    title: "How it becomes one index",
     description:
-      "Combine all three into one Heritage Risk Index, project it forward through IPCC AR6 climate pathways, and generate a prioritized, source-grounded conservation plan.",
+      "Hazard, vulnerability and exposure combine into a single Heritage Risk Index (0.40 ESS + 0.40 BCS + 0.20 OIS), then project forward under IPCC pathways to a Future HRI and a prioritized, source-grounded conservation plan.",
   },
 ]
 
@@ -175,7 +182,7 @@ const StepImage = forwardRef<HTMLImageElement, StepImageProps>(
         className={className}
         src={src}
         style={{ position: "absolute", userSelect: "none", maxWidth: "unset", ...style }}
-        // No online placeholder fallback — a failed image simply hides itself.
+        // No online placeholder fallback, a failed image simply hides itself.
         onError={(e) => { e.currentTarget.style.display = "none" }}
         {...props}
       />
@@ -293,13 +300,15 @@ function StepsNav({ steps: stepItems, current, onChange }: { steps: readonly Ste
 }
 
 const defaultClasses = {
-  img: "rounded-xl border border-[#DBC9AC] shadow-2xl shadow-black/10",
-  step1img1: "w-[50%] left-0 top-[15%]",
-  step1img2: "w-[60%] left-[40%] top-[35%]",
-  step2img1: "w-[50%] left-[5%] top-[20%]",
-  step2img2: "w-[40%] left-[55%] top-[45%]",
-  step3img: "w-[90%] left-[5%] top-[25%]",
-  step4img: "w-[90%] left-[5%] top-[25%]",
+  img: "rounded-xl border border-[#DBC9AC] shadow-2xl shadow-black/10 object-cover",
+  step1img1: "w-[50%] left-0 top-[12%]",
+  step1img2: "w-[58%] left-[40%] top-[36%]",
+  step2img1: "w-[50%] left-[3%] top-[16%]",
+  step2img2: "w-[52%] left-[46%] top-[42%]",
+  step3img1: "w-[50%] left-[3%] top-[16%]",
+  step3img2: "w-[52%] left-[46%] top-[42%]",
+  step4img1: "w-[50%] left-[3%] top-[16%]",
+  step4img2: "w-[52%] left-[46%] top-[42%]",
 } as const
 
 export function FeatureCarousel({
@@ -308,8 +317,10 @@ export function FeatureCarousel({
   step1img2Class = defaultClasses.step1img2,
   step2img1Class = defaultClasses.step2img1,
   step2img2Class = defaultClasses.step2img2,
-  step3imgClass = defaultClasses.step3img,
-  step4imgClass = defaultClasses.step4img,
+  step3img1Class = defaultClasses.step3img1,
+  step3img2Class = defaultClasses.step3img2,
+  step4img1Class = defaultClasses.step4img1,
+  step4img2Class = defaultClasses.step4img2,
   ...props
 }: FeatureCarouselProps) {
   const { currentNumber: step, setStep } = useNumberCycler()
@@ -325,14 +336,24 @@ export function FeatureCarousel({
       case 1:
         return (
           <div className="relative w-full h-full">
-            <AnimatedStepImage alt={image.alt} className={cn(defaultClasses.img, step2img1Class)} src={image.step2img1} preset="fadeInScale" />
-            <AnimatedStepImage alt={image.alt} className={cn(defaultClasses.img, step2img2Class)} src={image.step2img2} preset="fadeInScale" delay={0.1} />
+            <AnimatedStepImage alt={image.alt} className={cn(defaultClasses.img, step2img1Class)} src={image.step2img1} preset="slideInLeft" />
+            <AnimatedStepImage alt={image.alt} className={cn(defaultClasses.img, step2img2Class)} src={image.step2img2} preset="slideInRight" delay={0.1} />
           </div>
         )
       case 2:
-        return <AnimatedStepImage alt={image.alt} className={cn(defaultClasses.img, step3imgClass)} src={image.step3img} preset="fadeInScale" />
+        return (
+          <div className="relative w-full h-full">
+            <AnimatedStepImage alt={image.alt} className={cn(defaultClasses.img, step3img1Class)} src={image.step3img1} preset="slideInLeft" />
+            <AnimatedStepImage alt={image.alt} className={cn(defaultClasses.img, step3img2Class)} src={image.step3img2} preset="slideInRight" delay={0.1} />
+          </div>
+        )
       case 3:
-        return <AnimatedStepImage alt={image.alt} className={cn(defaultClasses.img, step4imgClass)} src={image.step4img} preset="fadeInScale" />
+        return (
+          <div className="relative w-full h-full">
+            <AnimatedStepImage alt={image.alt} className={cn(defaultClasses.img, step4img1Class)} src={image.step4img1} preset="slideInLeft" />
+            <AnimatedStepImage alt={image.alt} className={cn(defaultClasses.img, step4img2Class)} src={image.step4img2} preset="slideInRight" delay={0.1} />
+          </div>
+        )
       default:
         return null
     }

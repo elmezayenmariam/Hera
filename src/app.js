@@ -1,13 +1,13 @@
 /* ==========================================================================
-   HERA — main application module.
+   HERA, main application module.
    This file intentionally keeps state, geo, strategy, action-plan, image
    retrieval, Conservation Action Plan rendering, and the page router together
    in one module. These pieces call each other (and call render()) constantly
-   — including from async callbacks — which means splitting them into more
+, including from async callbacks, which means splitting them into more
    ES modules would require several circular imports. Circular ES module
    imports *are* supported by the spec as long as the imported binding is only
    used inside a function body (never at top-level module-evaluation time),
-   which is true almost everywhere in this codebase — but the one exception,
+   which is true almost everywhere in this codebase, but the one exception,
    loadImageCache() being invoked at the bottom of this very file during
    startup, is exactly the kind of ordering subtlety that is easy to get
    wrong when refactoring by hand. Keeping this cluster in one file removes
@@ -22,7 +22,7 @@ import { mountFeatureCarousel, unmountFeatureCarousel } from './featureCarousel.
 
 /* ============================== ICONS ==============================
    Inline stroke SVGs (Lucide-style, currentColor) used everywhere the UI
-   previously relied on emoji. Purely presentational — icon() just returns a
+   previously relied on emoji. Purely presentational, icon() just returns a
    markup string that inherits the surrounding text colour and can be sized
    via CSS. Never affects logic. */
 const ICONS = {
@@ -63,12 +63,18 @@ function icon(name, size){
 }
 const STEP_ICONS = ['home','building','thermometer','layers','users','gauge','climate','clipboard'];
 
-/* Cairo monthly mean daytime solar radiation (W/m²), Jan→Dec — derived from the
-   Cairo solar-radiation climatology published at en.tutiempo.net/solar-radiation/cairo.html.
-   Used as the sensible default / offline fallback for the Solar Radiation indicator,
-   so the field never starts at an implausible 0 (e.g. when live data is fetched at night). */
-const CAIRO_SOLAR_WM2 = [265,320,395,450,480,505,495,470,425,355,290,250];
-const SOLAR_SOURCE_NOTE = 'Default from Cairo monthly solar climatology — en.tutiempo.net/solar-radiation/cairo.html';
+/* Cairo solar radiation, grounded in en.tutiempo.net/solar-radiation/cairo.html.
+   That page reports daily GLOBAL solar radiation as a daily total in Wh/m²/day
+   (e.g. ~7,300-7,480 Wh/m²/day in July). CAIRO_SOLAR_WH_DAY holds the monthly
+   daily-total values (Wh/m²/day) on that same basis, Jan..Dec. The Solar Radiation
+   indicator is expressed as a mean DAYTIME irradiance in W/m², so we convert each
+   daily total by dividing by that month's mean daylight hours in Cairo. This keeps
+   the fallback tied to the site's actual figures instead of an invented curve, and
+   never starts the field at an implausible 0 (e.g. when live data is fetched at night). */
+const CAIRO_SOLAR_WH_DAY   = [3400,4400,5600,6600,7400,8000,7900,7300,6300,4900,3700,3100]; // Wh/m²/day (tutiempo basis)
+const CAIRO_DAYLIGHT_HOURS = [10.5,11.2,12.0,12.9,13.6,14.0,13.8,13.1,12.2,11.3,10.6,10.3]; // Cairo mean daylight h
+const CAIRO_SOLAR_WM2 = CAIRO_SOLAR_WH_DAY.map((wh,i)=>Math.round(wh/CAIRO_DAYLIGHT_HOURS[i])); // mean daytime W/m²
+const SOLAR_SOURCE_NOTE = 'Default from Cairo solar radiation (en.tutiempo.net/solar-radiation/cairo.html), daily global irradiation in Wh/m²/day converted to mean daytime W/m².';
 function cairoSolarDefault(){ return CAIRO_SOLAR_WM2[new Date().getMonth()]; }
 
 /* ============================== GEO-ENVIRONMENTAL MODULE ==============================
@@ -76,12 +82,12 @@ function cairoSolarDefault(){ return CAIRO_SOLAR_WM2[new Date().getMonth()]; }
    clicks a point on the map, and HERA auto-retrieves current environmental readings
    from free, no-API-key public services, pre-filling the ESS inputs (which remain
    fully editable/overridable). Future SSP projections then run automatically off of
-   whatever baseline ends up in state.ess — no separate "future" fetch is needed.
+   whatever baseline ends up in state.ess, no separate "future" fetch is needed.
 
    GEO_PROVIDERS is intentionally a flat, swappable config: to add a new dataset
    (e.g. a real Urban Heat Island raster, a local air-quality station network, or a
    national heritage-building elevation registry), add one entry here with a `url()`
-   builder and a matching read-out in geoFetchEnvironment() — nothing else in the
+   builder and a matching read-out in geoFetchEnvironment(), nothing else in the
    module needs to change. */
 const GEO_PROVIDERS = {
   geocode:   {name:'OpenStreetMap Nominatim', url:(q)=>`https://nominatim.openstreetmap.org/search?format=json&limit=5&addressdetails=1&q=${encodeURIComponent(q)}`},
@@ -89,7 +95,7 @@ const GEO_PROVIDERS = {
   weather:   {name:'Open-Meteo Forecast',     url:(lat,lng)=>`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current=temperature_2m,relative_humidity_2m&hourly=shortwave_radiation&forecast_days=1&timezone=auto`},
   elevation: {name:'Open-Meteo Elevation',    url:(lat,lng)=>`https://api.open-meteo.com/v1/elevation?latitude=${lat}&longitude=${lng}`},
   airQuality:{name:'Open-Meteo Air Quality',  url:(lat,lng)=>`https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lat}&longitude=${lng}&current=us_aqi,pm2_5`},
-  // Not yet integrated — no reliable free/open API at building-scale resolution today.
+  // Not yet integrated, no reliable free/open API at building-scale resolution today.
   // Placeholder kept so a future raster/dataset (e.g. Landsat-derived LST anomaly) can
   // be wired in without restructuring the rest of the module.
   uhi:       {name:'Urban Heat Island intensity (not yet integrated)', url:null}
@@ -123,7 +129,7 @@ function mountGeoMap(){
     if(geoMarkerInstance){ geoMarkerInstance.setLatLng(e.latlng); } else { geoMarkerInstance = L.marker(e.latlng).addTo(geoMapInstance); }
     reverseGeocode(state.geo.lat, state.geo.lng); // fire-and-forget; updates label + re-renders when done
     const txt = document.getElementById('geoSelectedText');
-    if(txt) txt.innerHTML = `<b>${state.geo.lat}, ${state.geo.lng}</b> — resolving place name… — click "Fetch Environmental Data" to populate ESS below.`;
+    if(txt) txt.innerHTML = `<b>${state.geo.lat}, ${state.geo.lng}</b>, resolving place name…, click "Fetch Environmental Data" to populate ESS below.`;
     const btn = document.getElementById('geoFetchBtn');
     if(btn) btn.disabled = false;
   });
@@ -131,7 +137,7 @@ function mountGeoMap(){
 }
 
 /* Reverse geocoding: turns a clicked lat/lng into a human-readable place name.
-   Fire-and-forget from the map click handler — doesn't block coordinate
+   Fire-and-forget from the map click handler, doesn't block coordinate
    selection, just enriches the display once it resolves. */
 async function reverseGeocode(lat, lng){
   if(geoReverseController) geoReverseController.abort();
@@ -164,7 +170,7 @@ async function geoSearch(){
 
   if(!isOnline()){
     state.geo.searching = false;
-    state.geo.error = 'You appear to be offline — connect to the internet to search, or click directly on the map.';
+    state.geo.error = 'You appear to be offline, connect to the internet to search, or click directly on the map.';
     render();
     return;
   }
@@ -173,13 +179,13 @@ async function geoSearch(){
     const data = await fetchJSON(GEO_PROVIDERS.geocode.url(q), {signal: geoSearchController.signal, timeoutMs:8000});
     if(myRequestId !== geoSearchRequestId) return; // a newer search superseded this one
     state.geo.results = (data||[]).map(d=>({label:d.display_name, lat:parseFloat(d.lat), lng:parseFloat(d.lon)}));
-    if(!state.geo.results.length) state.geo.error = 'No matches found — try a broader search term, or click directly on the map.';
+    if(!state.geo.results.length) state.geo.error = 'No matches found, try a broader search term, or click directly on the map.';
   }catch(err){
     if(myRequestId !== geoSearchRequestId) return;
-    if(err.message === 'offline') state.geo.error = 'You appear to be offline — connect to the internet to search, or click directly on the map.';
-    else if(err.message === 'timeout') state.geo.error = 'Search timed out — the geocoding service may be slow or unreachable. Try again, or click directly on the map.';
+    if(err.message === 'offline') state.geo.error = 'You appear to be offline, connect to the internet to search, or click directly on the map.';
+    else if(err.message === 'timeout') state.geo.error = 'Search timed out, the geocoding service may be slow or unreachable. Try again, or click directly on the map.';
     else if(err.name === 'AbortError') return; // superseded, not a real error
-    else state.geo.error = 'Search request failed (network/CORS) — click directly on the map instead.';
+    else state.geo.error = 'Search request failed (network/CORS), click directly on the map instead.';
   }
   if(myRequestId === geoSearchRequestId){ state.geo.searching = false; render(); }
 }
@@ -192,7 +198,7 @@ function selectGeoResult(lat, lng, label){
 
 /* ---------- Live autocomplete (search-engine-style suggestions) ----------
    Fires as the user types (debounced), and updates ONLY the results box in the
-   DOM — never a full render() — so the input keeps focus while typing. */
+   DOM, never a full render(), so the input keeps focus while typing. */
 let geoTypeTimer = null;
 function geoResultsBoxHTML(list){
   return (list||[]).map(r=>`<div class="geo-result" onclick='selectGeoResult(${r.lat},${r.lng},${JSON.stringify(r.label)})'>${icon('pin',12)} ${r.label}</div>`).join('');
@@ -219,7 +225,7 @@ async function geoSuggest(q){
     if(myRequestId !== geoSearchRequestId) return;
     state.geo.results = (data||[]).map(d=>({label:d.display_name, lat:parseFloat(d.lat), lng:parseFloat(d.lon)}));
     updateGeoResultsBox();
-  }catch(err){ /* stale/aborted/failed suggestion — silently ignore, typing continues */ }
+  }catch(err){ /* stale/aborted/failed suggestion, silently ignore, typing continues */ }
 }
 
 async function geoFetchEnvironment(){
@@ -229,7 +235,7 @@ async function geoFetchEnvironment(){
 
   if(!isOnline()){
     state.geo.fetching = false;
-    state.geo.error = 'You appear to be offline — enter ESS values manually below, or reconnect and try again.';
+    state.geo.error = 'You appear to be offline, enter ESS values manually below, or reconnect and try again.';
     render();
     return;
   }
@@ -247,7 +253,7 @@ async function geoFetchEnvironment(){
       if(typeof cur.temperature_2m === 'number') state.ess.temp = Math.round(cur.temperature_2m*10)/10;
       if(typeof cur.relative_humidity_2m === 'number') state.ess.rh = Math.round(cur.relative_humidity_2m);
       // Use the DAYTIME MEAN of the hourly shortwave series rather than the instant
-      // value at fetch time — fetching at night would otherwise auto-fill 0 W/m².
+      // value at fetch time, fetching at night would otherwise auto-fill 0 W/m².
       // If the whole series is zero/unavailable, fall back to the Cairo monthly
       // climatology (en.tutiempo.net/solar-radiation/cairo.html).
       const hourly = wx.value.hourly;
@@ -263,10 +269,10 @@ async function geoFetchEnvironment(){
     state.geo.fetched = new Date().toLocaleString();
     if(wx.status!=='fulfilled'){
       const reason = wx.reason && wx.reason.message==='timeout' ? ' (request timed out)' : '';
-      state.geo.error = 'Weather service unavailable'+reason+' — enter ESS values manually below.';
+      state.geo.error = 'Weather service unavailable'+reason+', enter ESS values manually below.';
     }
   }catch(err){
-    state.geo.error = 'Could not retrieve environmental data — enter values manually below.';
+    state.geo.error = 'Could not retrieve environmental data, enter values manually below.';
   }
   state.geo.fetching = false;
   render();
@@ -276,7 +282,7 @@ function geoPanel(){
   const g = state.geo;
   return `<div class="indicator-block" style="margin-bottom:20px;">
     <div class="ihead"><span class="iname">${icon('pin',16)} Auto-Retrieve Environmental Data</span></div>
-    <div class="sub" style="margin-bottom:10px;">Search for the building or click a point on the map — HERA fetches live conditions and pre-fills the indicators below. Every value stays editable.</div>
+    <div class="sub" style="margin-bottom:10px;">Search for the building or click a point on the map, HERA fetches live conditions and pre-fills the indicators below. Every value stays editable.</div>
 
     <div class="geo-searchrow">
       <input id="geoQueryInput" type="text" placeholder="e.g. Baron Empain Palace, Heliopolis, Cairo" autocomplete="off"
@@ -289,8 +295,8 @@ function geoPanel(){
     <div id="geoMap"></div>
     <div id="geoSelectedText" style="font-size:12.5px;color:var(--muted);margin-bottom:12px;">
       ${g.lat!=null
-        ? `Selected: <b>${g.lat}, ${g.lng}</b>${g.reverseLoading ? ' — resolving place name…' : (g.placeLabel ? `<br><span style="color:var(--text);">${g.placeLabel}</span>` : '')}`
-        : 'No location selected yet — search above or click the map.'}
+        ? `Selected: <b>${g.lat}, ${g.lng}</b>${g.reverseLoading ? ', resolving place name…' : (g.placeLabel ? `<br><span style="color:var(--text);">${g.placeLabel}</span>` : '')}`
+        : 'No location selected yet, search above or click the map.'}
     </div>
 
     <button id="geoFetchBtn" class="primary" ${g.lat==null?'disabled':''} onclick="geoFetchEnvironment()">${g.fetching ? 'Fetching…' : `${icon('download',16)} Fetch Environmental Data`}</button>
@@ -300,19 +306,19 @@ function geoPanel(){
     ${g.fetched ? `
       <div class="geo-chip-row">
         <span class="geo-chip">Fetched <b>${g.fetched}</b></span>
-        <span class="geo-chip">Elevation: <b>${g.elevation!=null ? g.elevation+' m' : '— unavailable'}</b></span>
-        <span class="geo-chip">Air Quality (US AQI): <b>${g.airQuality && typeof g.airQuality.us_aqi==='number' ? g.airQuality.us_aqi : '— unavailable'}</b></span>
+        <span class="geo-chip">Elevation: <b>${g.elevation!=null ? g.elevation+' m' : ', unavailable'}</b></span>
+        <span class="geo-chip">Air Quality (US AQI): <b>${g.airQuality && typeof g.airQuality.us_aqi==='number' ? g.airQuality.us_aqi : ', unavailable'}</b></span>
         <span class="geo-chip">Urban Heat Island: <b>not yet integrated</b></span>
       </div>
       <div class="sub" style="margin-top:10px;">Temperature, humidity and solar radiation below have been auto-filled from Open-Meteo. Future SSP2-4.5 / SSP5-8.5 projections (Climate Scenarios step) apply their deltas on top of this baseline automatically.</div>
     ` : ''}
 
-    <div style="font-size:11px;color:var(--muted);margin-top:12px;">Live data via Open-Meteo (open-meteo.com) and OpenStreetMap Nominatim — both free, no API key required. Map tiles © OpenStreetMap contributors.</div>
+    <div style="font-size:11px;color:var(--muted);margin-top:12px;">Live data via Open-Meteo (open-meteo.com) and OpenStreetMap Nominatim, both free, no API key required. Map tiles © OpenStreetMap contributors.</div>
   </div>`;
 }
 
 /* Climate Scenario Engine itself (SSP table, BCS_ACCELERATION_K, projectScenario)
-   now lives in ./data/climate.js and is imported at the top of this file — see
+   now lives in ./data/climate.js and is imported at the top of this file, see
    that file for the full methodology note. */
 const STRATEGY_MATRIX = {
 'Routine Monitoring|ESS':'Periodic environmental monitoring, temperature and humidity tracking, and routine inspections.',
@@ -393,30 +399,30 @@ function buildPrompt(scenarioKey, mode){
   const caseStudyBlock = `=== CASE STUDY ===
 Building: ${b.name}
 Location: ${b.location}
-Building category: ${b.category||'—'}
-Construction year: ${b.year||'—'}
+Building category: ${b.category|| '-'}
+Construction year: ${b.year|| '-'}
 Construction era: ${b.era}
-Construction material: ${b.material||'—'}
+Construction material: ${b.material|| '-'}
 Current use: ${b.use}
-Current occupancy: ${b.occupancy||'—'}
-Typology: Late Khedival/Colonial-era load-bearing masonry construction (1880-1940) — limestone ashlar, lime mortars, terracotta ornament.
+Current occupancy: ${b.occupancy|| '-'}
+Typology: Late Khedival/Colonial-era load-bearing masonry construction (1880-1940), limestone ashlar, lime mortars, terracotta ornament.
 
 === CLIMATE SCENARIO EVALUATED ===
 Scenario: ${scenarioLabel}${scenarioKey!=='current' ? ` (IPCC AR6 projected temperature increase: +${dT}\u00b0C by 2100)` : ' (present-day baseline)'}
 
 === HERITAGE RISK ASSESSMENT RESULTS ===
-Environmental Stress Score (ESS): ${ess.toFixed(1)}/100 — ${essCls.label} (Hazard)
+Environmental Stress Score (ESS): ${ess.toFixed(1)}/100, ${essCls.label} (Hazard)
   - Temperature indicator: input ${state.ess.temp}\u00b0C, score ${essR.parts.Temperature.toFixed(1)}
   - Relative Humidity indicator: input ${state.ess.rh}%, score ${essR.parts.Humidity.toFixed(1)}
   - Solar Radiation indicator: input ${state.ess.solar} W/m\u00b2, score ${essR.parts.Solar.toFixed(1)}
 
-Building Condition Score (BCS): ${bcs.toFixed(1)}/100 — ${bcsCls.label} (Vulnerability)
+Building Condition Score (BCS): ${bcs.toFixed(1)}/100, ${bcsCls.label} (Vulnerability)
   - Material Decay: ${bi.materialDecay}, score ${bcsR.parts.MaterialDecay.toFixed(1)} (weight 40%)
   - Cracking: ${bi.crack} mm, score ${bcsR.parts.Cracking.toFixed(1)} (weight 30%)
   - Surface Loss: ${bi.surfaceLoss}%, score ${bcsR.parts.SurfaceLoss.toFixed(1)} (weight 20%)
   - Biological Growth: ${bi.bioGrowth}, score ${bcsR.parts.BiologicalGrowth.toFixed(1)} (weight 10%)
 
-Occupancy Impact Score (OIS): ${ois.toFixed(1)}/100 — ${oisCls.label} (Exposure)
+Occupancy Impact Score (OIS): ${ois.toFixed(1)}/100, ${oisCls.label} (Exposure)
   - Occupancy Density: ${oi.density} persons/m\u00b2, score ${oisR.parts.OccupancyDensity.toFixed(1)}
   - Visitor Load: ${oi.visitorLoad}, score ${oisR.parts.VisitorLoad.toFixed(1)}
   - Event Frequency: ${oi.eventFreq}, score ${oisR.parts.EventFrequency.toFixed(1)}
@@ -435,11 +441,11 @@ ${strat.text}`;
 ${caseStudyBlock}
 
 === YOUR TASK ===
-Using only the assessment data above and established heritage conservation literature (UNESCO Managing Cultural World Heritage; World Heritage Resource Manual; ICOMOS charters and climate change adaptation guidance; published restoration practice for Egyptian Khedival/Colonial-era masonry buildings), expand the rule-based baseline strategy above into a conservation action plan tailored specifically to this building's actual indicator readings — not generic advice.
+Using only the assessment data above and established heritage conservation literature (UNESCO Managing Cultural World Heritage; World Heritage Resource Manual; ICOMOS charters and climate change adaptation guidance; published restoration practice for Egyptian Khedival/Colonial-era masonry buildings), expand the rule-based baseline strategy above into a conservation action plan tailored specifically to this building's actual indicator readings, not generic advice.
 
 Your response must:
 1. Explain why each recommendation responds to the specific dominant risk driver(s) and indicator values reported above.
-2. Stay within the rule-based baseline conservation priority category (${hriCls.priority}) — do not recommend interventions from a different response tier without explicit justification.
+2. Stay within the rule-based baseline conservation priority category (${hriCls.priority}), do not recommend interventions from a different response tier without explicit justification.
 3. Respect minimal-intervention and reversibility principles; avoid treatments incompatible with historic masonry, lime mortars, or terracotta ornament.
 4. Be structured under these headings:
    - Immediate Actions
@@ -459,11 +465,11 @@ ${caseStudyBlock}
 ${retrievedBlock}
 
 === YOUR TASK ===
-Using the assessment data above and the retrieved references, expand the rule-based baseline strategy into a conservation action plan tailored specifically to this building's actual indicator readings — not generic advice. You may also draw on established heritage conservation literature (ICOMOS charters, climate change adaptation guidance) where the retrieved references don't fully cover a point, but prioritize grounding recommendations in the retrieved references above.
+Using the assessment data above and the retrieved references, expand the rule-based baseline strategy into a conservation action plan tailored specifically to this building's actual indicator readings, not generic advice. You may also draw on established heritage conservation literature (ICOMOS charters, climate change adaptation guidance) where the retrieved references don't fully cover a point, but prioritize grounding recommendations in the retrieved references above.
 
 Your response must:
 1. Explain why each recommendation responds to the specific dominant risk driver(s) and indicator values reported above.
-2. Stay within the rule-based baseline conservation priority category (${hriCls.priority}) — do not recommend interventions from a different response tier without explicit justification.
+2. Stay within the rule-based baseline conservation priority category (${hriCls.priority}), do not recommend interventions from a different response tier without explicit justification.
 3. Respect minimal-intervention and reversibility principles; avoid treatments incompatible with historic masonry, lime mortars, or terracotta ornament.
 4. Be structured under these headings:
    - Immediate Actions
@@ -479,7 +485,7 @@ Your response must:
    Produces an actual conservation solution directly inside HERA (no external AI call),
    by templating the rule-based strategy + retrieved knowledge base chunks into the same
    six-heading structure used by the prompt. This is the answer itself, not a request for
-   one — useful when the person doesn't want to go validate with an external model. */
+   one, useful when the person doesn't want to go validate with an external model. */
 const SECTION_TAGS = {
   immediate: ['intervention','minimalintervention','retrofitting','cracking'],
   preventive: ['materialdecay','biologicalgrowth','saltcrystallization','surfaceloss','vulnerability','maintenance'],
@@ -495,10 +501,10 @@ const MAINTENANCE_CADENCE = {
 };
 
 function climateNarrative(a){
-  return `Environmental buffering measures — shading, ventilation, and drainage improvements — should target the specific climatic mechanisms (${a.drivers.includes('ESS') ? 'elevated temperature, humidity and solar exposure' : 'temperature, humidity and solar exposure'}) currently degrading this building's fabric, and should be re-evaluated whenever the Future HRI is projected under a more severe climate scenario.`;
+  return `Environmental buffering measures, shading, ventilation, and drainage improvements, should target the specific climatic mechanisms (${a.drivers.includes('ESS') ? 'elevated temperature, humidity and solar exposure' : 'temperature, humidity and solar exposure'}) currently degrading this building's fabric, and should be re-evaluated whenever the Future HRI is projected under a more severe climate scenario.`;
 }
 function monitoringNarrative(a){
-  return `Establish a monitoring regime — condition surveys, environmental data logging, and structural checks — at a frequency matching the <b>${a.hriCls.priority}</b> category, so early signs of deterioration are caught and acted on before they escalate.`;
+  return `Establish a monitoring regime, condition surveys, environmental data logging, and structural checks, at a frequency matching the <b>${a.hriCls.priority}</b> category, so early signs of deterioration are caught and acted on before they escalate.`;
 }
 
 function pickBySectionTags(chunks, tagList, max){
@@ -526,7 +532,7 @@ function generateLocalSolution(scenarioKey){
   return {
     a,
     immediate: {
-      text: immediateNeeded ? a.strat.text : 'No immediate emergency action is indicated at the current Conservation Priority Category — proceed directly to Preventive Conservation below.',
+      text: immediateNeeded ? a.strat.text : 'No immediate emergency action is indicated at the current Conservation Priority Category, proceed directly to Preventive Conservation below.',
       refs: immediateChunks
     },
     preventive: {
@@ -570,7 +576,7 @@ function eraFromYear(year){
 }
 
 /* ============================================================================
-   PHASE 2 — CONSERVATION ACTION PLAN
+   PHASE 2, CONSERVATION ACTION PLAN
    Final module. Built entirely on top of the existing, untouched calculation
    layer (computeESS/BCS/OIS, computeHRI, classify, dominantDrivers,
    assembleAssessment, KNOWLEDGE_BASE, retrieveKnowledge, generateLocalSolution).
@@ -578,7 +584,7 @@ function eraFromYear(year){
 
 /* ---------- Critical Indicators ----------
    A sub-indicator is "critical" for Phase 2 purposes once its own score lands
-   in Moderate/Fair or worse — i.e. the same band tables already used
+   in Moderate/Fair or worse, i.e. the same band tables already used
    everywhere else in HERA (BANDS_GENERIC / BANDS_BCS), just applied per
    sub-indicator instead of per pillar. This is a new derived read of scores
    HERA already computes; it does not change how ESS/BCS/OIS/HRI themselves
@@ -630,7 +636,7 @@ const ISSUE_TEMPLATES = {
   humidity: {
     issue:'Moisture-Driven Deterioration (Salt Cycling & Biological Risk)',
     expectedOutcome:'Reduced amplitude of humidity fluctuation across the salt deliquescence point, lower future risk of subflorescence/efflorescence and biological growth, decreased future ESS contribution to HRI.',
-    recommendation:'Improve passive ventilation and repair any blocked or damaged rainwater goods and perimeter drainage before considering mechanical dehumidification. Install unobtrusive environmental data loggers to establish a baseline before specifying further intervention — treat the cause (water ingress, poor ventilation) rather than only the symptom.',
+    recommendation:'Improve passive ventilation and repair any blocked or damaged rainwater goods and perimeter drainage before considering mechanical dehumidification. Install unobtrusive environmental data loggers to establish a baseline before specifying further intervention, treat the cause (water ingress, poor ventilation) rather than only the symptom.',
     materials:['Lime-based repointing mortar (breathable)','Environmental data loggers','Perimeter drainage components'],
     expertise:['Conservation Technician','Structural Engineer'],
     cost:2, duration:'3 months',
@@ -639,7 +645,7 @@ const ISSUE_TEMPLATES = {
   solar: {
     issue:'Excess Solar Radiation Exposure',
     expectedOutcome:'Reduced surface heating and UV exposure on finishes, slower thermoclastic micro-cracking, reduced future ESS contribution to HRI.',
-    recommendation:'Introduce reversible shading elements on the most exposed elevations. Where non-historic glazing exists, UV-filtering film may be applied — never on original historic glass or openings. Monitor solar radiation seasonally to verify shading remains adequate under the selected climate scenario.',
+    recommendation:'Introduce reversible shading elements on the most exposed elevations. Where non-historic glazing exists, UV-filtering film may be applied, never on original historic glass or openings. Monitor solar radiation seasonally to verify shading remains adequate under the selected climate scenario.',
     materials:['Reversible shading structures','UV-filtering film (non-historic glazing only)','Solar radiation monitoring sensor'],
     expertise:['Architectural Conservator'],
     cost:2, duration:'3 months',
@@ -648,7 +654,7 @@ const ISSUE_TEMPLATES = {
   materialdecay: {
     issue:'Material Decay of Original Fabric',
     expectedOutcome:'Stabilized material substrate, arrested progression of decay, improved long-term structural durability, decreased future BCS contribution to HRI.',
-    recommendation:'Undertake targeted consolidation of decayed stone and mortar using materials compatible with the original limestone fabric — hydraulic lime-based consolidants and repair mortars rather than Portland cement or synthetic resins. Test all repair materials for compatibility (porosity, salt content, mechanical strength) before application; any replacement stone should behave like the original but remain identifiable on close inspection, per the conservation ethic of honesty.',
+    recommendation:'Undertake targeted consolidation of decayed stone and mortar using materials compatible with the original limestone fabric, hydraulic lime-based consolidants and repair mortars rather than Portland cement or synthetic resins. Test all repair materials for compatibility (porosity, salt content, mechanical strength) before application; any replacement stone should behave like the original but remain identifiable on close inspection, per the conservation ethic of honesty.',
     materials:['Hydraulic lime mortar','Compatible limestone (matched porosity)','Lime-based consolidant'],
     expertise:['Stone Conservator','Architectural Conservator'],
     cost:3, duration:'3 months',
@@ -657,11 +663,11 @@ const ISSUE_TEMPLATES = {
   cracking: {
     issue:'Structural Cracking',
     expectedOutcome:'Arrested crack propagation, restored structural continuity, reduced water-ingress pathways, decreased future BCS contribution to HRI.',
-    recommendation:'Commission a structural engineer to assess whether cracking is active or dormant using crack-monitoring gauges before any grouting. Where confirmed appropriate, inject compatible lime-based grout into structural cracks, following the minimum-intervention hierarchy — traditional materials and techniques first, escalating to modern materials only where structural performance cannot otherwise be achieved.',
+    recommendation:'Commission a structural engineer to assess whether cracking is active or dormant using crack-monitoring gauges before any grouting. Where confirmed appropriate, inject compatible lime-based grout into structural cracks, following the minimum-intervention hierarchy, traditional materials and techniques first, escalating to modern materials only where structural performance cannot otherwise be achieved.',
     materials:['Lime-based injection grout','Crack monitoring gauges (tell-tales)','Stainless steel or titanium pins (if reinforcement required)'],
     expertise:['Structural Engineer','Stone Conservator'],
     cost:3, duration:'3 months',
-    warning:{doNot:'Do not inject rigid cement-based grout into active or unassessed cracks.', reason:'Rigid grout cannot accommodate ongoing structural movement and may worsen cracking elsewhere.', consequence:'New cracking adjacent to the repair and loss of structural monitoring data.', reference:'UNESCO Managing Disaster Risks for World Heritage — post-earthquake retrofitting precedent'}
+    warning:{doNot:'Do not inject rigid cement-based grout into active or unassessed cracks.', reason:'Rigid grout cannot accommodate ongoing structural movement and may worsen cracking elsewhere.', consequence:'New cracking adjacent to the repair and loss of structural monitoring data.', reference:'UNESCO Managing Disaster Risks for World Heritage, post-earthquake retrofitting precedent'}
   },
   surfaceloss: {
     issue:'Surface Loss / Material Erosion',
@@ -684,7 +690,7 @@ const ISSUE_TEMPLATES = {
   occupancy: {
     issue:'Occupancy & Visitor Pressure',
     expectedOutcome:'Reduced humidity and thermal loading from visitor presence, reduced mechanical wear on floors and circulation routes, decreased future OIS contribution to HRI.',
-    recommendation:'Introduce a visitor management plan — capped occupancy limits, timed-entry scheduling for high-demand periods, and protective circulation routes over sensitive floor and finish areas. For event use, restrict high-load events in the most vulnerable spaces and require a post-event condition check.',
+    recommendation:'Introduce a visitor management plan, capped occupancy limits, timed-entry scheduling for high-demand periods, and protective circulation routes over sensitive floor and finish areas. For event use, restrict high-load events in the most vulnerable spaces and require a post-event condition check.',
     materials:['Protective walkway matting','Visitor counting sensors','Circulation barriers / stanchions'],
     expertise:['Routine Maintenance','Conservation Technician'],
     cost:1, duration:'2 weeks',
@@ -721,7 +727,7 @@ function buildActionPlan(scenarioKey){
     if(!tmpl) return null;
     const priority = priorityFromLabel(ci.label);
     const evidence = retrieveKnowledgeScored(Array.from(new Set([ci.key, ...a.queryTags])), 4);
-    const why = `This recommendation responds to <b>${ci.name}</b> (indicator score ${ci.score.toFixed(1)}/100, classified <b>${ci.label}</b>). At the <b>${a.scenarioLabel}</b> scenario the Heritage Risk Index is <b>${a.hri.toFixed(1)}</b> (${a.hriCls.label}), against a Current (baseline) HRI of <b>${hriCurrent.toFixed(1)}</b>, with <b>${a.drivers.join(' + ')}</b> identified as the dominant risk driver(s). Given this building's <b>${b.material||'—'}</b> construction and its current adaptive reuse as a <b>${b.use}</b>, this intervention is prioritized within the <b>${a.hriCls.priority}</b> conservation category.`;
+    const why = `This recommendation responds to <b>${ci.name}</b> (indicator score ${ci.score.toFixed(1)}/100, classified <b>${ci.label}</b>). At the <b>${a.scenarioLabel}</b> scenario the Heritage Risk Index is <b>${a.hri.toFixed(1)}</b> (${a.hriCls.label}), against a Current (baseline) HRI of <b>${hriCurrent.toFixed(1)}</b>, with <b>${a.drivers.join(' + ')}</b> identified as the dominant risk driver(s). Given this building's <b>${b.material|| '-'}</b> construction and its current adaptive reuse as a <b>${b.use}</b>, this intervention is prioritized within the <b>${a.hriCls.priority}</b> conservation category.`;
     return {id: ci.key+'_'+ci.name.replace(/\s+/g,''), issue:tmpl.issue, priority, why,
       expectedOutcome:tmpl.expectedOutcome, recommendation:tmpl.recommendation,
       materials:tmpl.materials, expertise:tmpl.expertise, cost:tmpl.cost, duration:tmpl.duration,
@@ -731,7 +737,7 @@ function buildActionPlan(scenarioKey){
   if(items.length === 0){
     const evidence = retrieveKnowledgeScored(a.queryTags, 4);
     items.push({id:'general', issue:'Routine Preventive Care', priority: a.hriCls.label==='Very Low' ? 'Low' : priorityFromLabel(a.hriCls.label),
-      why:`No individual indicator currently exceeds the Moderate risk threshold. At the <b>${a.scenarioLabel}</b> scenario the HRI is <b>${a.hri.toFixed(1)}</b> (${a.hriCls.label}), against a Current HRI of <b>${hriCurrent.toFixed(1)}</b>. Given the ${b.material||'—'} construction and ${b.use} use, routine preventive care is sufficient at this time.`,
+      why:`No individual indicator currently exceeds the Moderate risk threshold. At the <b>${a.scenarioLabel}</b> scenario the HRI is <b>${a.hri.toFixed(1)}</b> (${a.hriCls.label}), against a Current HRI of <b>${hriCurrent.toFixed(1)}</b>. Given the ${b.material|| '-'} construction and ${b.use} use, routine preventive care is sufficient at this time.`,
       expectedOutcome:'Maintained current condition; early detection of any emerging deterioration.',
       recommendation:a.strat.text, materials:['Environmental monitoring sensors','Basic maintenance tools'],
       expertise:['Routine Maintenance'], cost:1, duration:'2 days',
@@ -751,7 +757,7 @@ function buildActionPlan(scenarioKey){
    not-yet-integrated data sources. */
 /* Case-study comparators selected for framework transferability across
    adaptive-reuse heritage palaces, villas and landmark buildings of the
-   c.1880–1940 period — Baron Palace's typology, construction period and
+   c.1880–1940 period, Baron Palace's typology, construction period and
    public-access status. Two contextual groups: the Empain-developed Heliopolis
    garden suburb, and Ismail-era Khedival Downtown Cairo.
    Sources: Dobrowolska (2006); Ilbert (1981); Volait (2001); Raafat (2003);
@@ -759,71 +765,71 @@ function buildActionPlan(scenarioKey){
 const CASE_STUDY_CITATIONS = 'Dobrowolska (2006) · Ilbert (1981) · Volait (2001) · Raafat (2003) · Ministry of Tourism & Antiquities (2024)';
 const CASE_STUDY_LIBRARY = [
   {id:'baron', name:'Baron Empain Palace', location:'Heliopolis, Cairo', year:'1907–1911',
-   group:'Heliopolis — Garden Suburb', primary:true,
+   group:'Heliopolis, Garden Suburb', primary:true,
    material:['Reinforced Concrete (early)','Limestone'], typology:['Palace'], adaptiveReuse:['Museum','Cultural Center'],
    climate:['hotarid','egypt'], techniques:['materialdecay','surfaceloss','occupancy'],
-   summary:'Primary case study — Hennebique reinforced-masonry palace of Cambodian/Hindu-inspired design, conserved and reopened as a public museum. Highly ornamental, climate-vulnerable exposed surfaces.',
+   summary:'Primary case study, Hennebique reinforced-masonry palace of Cambodian/Hindu-inspired design, conserved and reopened as a public museum. Highly ornamental, climate-vulnerable exposed surfaces.',
    strategies:['Structural consolidation of early reinforced concrete and decorative stonework','Environmental controls introduced for public museum access','Visitor-flow management around fragile ornamental surfaces'],
    lessons:'Balancing public accessibility with conservation of ornamental, climate-vulnerable surfaces is the central challenge for museum-type adaptive reuse of Cairo-era palaces.',
    references:['Raafat (2003)','Ministry of Tourism & Antiquities (2024)']},
   {id:'heliopolishotel', name:'Heliopolis Palace Hotel', location:'Heliopolis, Cairo', year:'1910',
-   group:'Heliopolis — Garden Suburb',
+   group:'Heliopolis, Garden Suburb',
    material:['Limestone + Brick','Reinforced Concrete (early)'], typology:['Palace','Landmark Building'], adaptiveReuse:['Administrative','Mixed Use'],
    climate:['hotarid','egypt'], techniques:['materialdecay','humidity','occupancy'],
-   summary:'The largest hotel of its era in the Empain-developed suburb, now Al-Ittihadiya Presidential Palace — a landmark conversion from hospitality to high-security state administrative use.',
+   summary:'The largest hotel of its era in the Empain-developed suburb, now Al-Ittihadiya Presidential Palace, a landmark conversion from hospitality to high-security state administrative use.',
    strategies:['Adaptation of a large hospitality plan to secure administrative use','Retention of monumental Heliopolis-style masonry facades'],
    lessons:'Very large single-function landmarks can absorb a wholesale change of use, but the conversion is driven by the new operational (occupancy/security) programme as much as by fabric condition.',
    references:['Ilbert (1981)','Dobrowolska (2006)']},
   {id:'basilica', name:'Basilica of Our Lady of Heliopolis', location:'Heliopolis, Cairo', year:'1910',
-   group:'Heliopolis — Garden Suburb',
+   group:'Heliopolis, Garden Suburb',
    material:['Reinforced Concrete (early)','Limestone'], typology:['Religious Building','Landmark Building'], adaptiveReuse:['Cultural Center','Educational'],
    climate:['hotarid','egypt'], techniques:['cracking','materialdecay'],
-   summary:'A Byzantine-Revival domed church and the Empain family mausoleum site — a religious landmark of the same suburb and construction period, sharing early-concrete dome construction.',
+   summary:'A Byzantine-Revival domed church and the Empain family mausoleum site, a religious landmark of the same suburb and construction period, sharing early-concrete dome construction.',
    strategies:['Conservation of large-span early-concrete dome structure','Crack monitoring and stabilization of the domed roof'],
    lessons:'Early reinforced-concrete domes of this generation need dedicated crack-monitoring regimes; their structural behaviour differs from the load-bearing masonry around them.',
    references:['Raafat (2003)']},
   {id:'orouba', name:'Al-Orouba Palace', location:'Heliopolis, Cairo', year:'1910',
-   group:'Heliopolis — Garden Suburb',
+   group:'Heliopolis, Garden Suburb',
    material:['Limestone','Limestone + Brick'], typology:['Palace','Public/Civic Building'], adaptiveReuse:['Administrative','Vacant / Unused'],
    climate:['hotarid','egypt'], techniques:['materialdecay','occupancy'],
-   summary:'The former Heliopolis Company headquarters, later the Ministry of Defense / a state guesthouse — a palace-scale building repurposed for civic-administrative use within the same suburb.',
+   summary:'The former Heliopolis Company headquarters, later the Ministry of Defense / a state guesthouse, a palace-scale building repurposed for civic-administrative use within the same suburb.',
    strategies:['Repurposing palatial interiors for administrative functions','Facade masonry conservation while in continuous official use'],
    lessons:'Buildings kept in continuous administrative use tend to retain fabric better than vacant ones, but conservation must work around an occupied, operational programme.',
    references:['Ilbert (1981)']},
   {id:'abdeen', name:'Abdeen Palace', location:'Downtown, Cairo', year:'1863–1874',
-   group:'Khedival Cairo — Downtown',
+   group:'Khedival Cairo, Downtown',
    material:['Limestone + Brick','Limestone'], typology:['Palace'], adaptiveReuse:['Museum'],
    climate:['hotarid','egypt'], techniques:['materialdecay','surfaceloss'],
-   summary:'A royal masonry palace and the earliest reference point for the Khedival era, now operated as a museum — a benchmark for high-value palatial adaptive reuse in Downtown Cairo.',
+   summary:'A royal masonry palace and the earliest reference point for the Khedival era, now operated as a museum, a benchmark for high-value palatial adaptive reuse in Downtown Cairo.',
    strategies:['Museum-standard environmental control of richly decorated royal interiors','Phased conservation across an extensive palace complex'],
    lessons:'The upper end of the palatial spectrum shows that intensive, museum-grade environmental control is achievable, but is resource-intensive across large complexes.',
    references:['Volait (2001)','Ministry of Tourism & Antiquities (2024)']},
   {id:'bourse', name:'Cairo Stock Exchange (Bourse)', location:'Downtown, Cairo', year:'1928',
-   group:'Khedival Cairo — Downtown',
+   group:'Khedival Cairo, Downtown',
    material:['Reinforced Concrete (early)','Limestone'], typology:['Public/Civic Building','Landmark Building'], adaptiveReuse:['Administrative','Mixed Use'],
    climate:['hotarid','egypt'], techniques:['surfaceloss','occupancy'],
-   summary:'A Neoclassical financial-district landmark of the interwar period with clear adaptive-reuse potential — a civic/commercial precedent rather than a palace.',
+   summary:'A Neoclassical financial-district landmark of the interwar period with clear adaptive-reuse potential, a civic/commercial precedent rather than a palace.',
    strategies:['Conservation of a Neoclassical civic facade','Adaptation of trading-hall interiors for mixed civic/cultural reuse'],
    lessons:'Civic/commercial landmarks broaden the framework beyond palaces, testing its transferability to non-residential adaptive-reuse programmes.',
    references:['Volait (2001)','Raafat (2003)']},
   {id:'sednaoui', name:'Sednaoui Department Store', location:'Khazindar Sq, Downtown, Cairo', year:'1913',
-   group:'Khedival Cairo — Downtown',
+   group:'Khedival Cairo, Downtown',
    material:['Brick Masonry','Other'], typology:['Public/Civic Building','Landmark Building'], adaptiveReuse:['Mixed Use'],
    climate:['hotarid','egypt'], techniques:['materialdecay','humidity','surfaceloss'],
-   summary:'An iron-and-glass Art Nouveau department store with a glazed central atrium, still in active commercial reuse — a rare metal/glass structural type for the period and climate.',
+   summary:'An iron-and-glass Art Nouveau department store with a glazed central atrium, still in active commercial reuse, a rare metal/glass structural type for the period and climate.',
    strategies:['Corrosion control of exposed iron structure and glazed atrium','Maintaining active commercial use during conservation'],
    lessons:'Iron-and-glass structures introduce metal-corrosion and glazing failure modes not seen in masonry palaces, requiring a different maintenance regime.',
    references:['Raafat (2003)']},
   {id:'immobilia', name:'Immobilia Building', location:'Downtown, Cairo', year:'1938',
-   group:'Khedival Cairo — Downtown',
+   group:'Khedival Cairo, Downtown',
    material:['Reinforced Concrete (early)'], typology:['Landmark Building','Public/Civic Building'], adaptiveReuse:['Mixed Use'],
    climate:['hotarid','egypt'], techniques:['surfaceloss','cracking','occupancy'],
-   summary:'A late Art Deco high-rise marking the transitional end of the 1880–1940 study period — a fully reinforced-concrete, mixed-use tower that bounds the framework\'s upper era limit.',
+   summary:'A late Art Deco high-rise marking the transitional end of the 1880–1940 study period, a fully reinforced-concrete, mixed-use tower that bounds the framework\'s upper era limit.',
    strategies:['Concrete-repair and reinforcement-corrosion management on a high-rise','Coordinating conservation with dense mixed-use occupancy'],
-   lessons:'The end of the study period is dominated by reinforced-concrete high-rises whose dominant risk is reinforcement corrosion — a useful contrast to the load-bearing masonry baseline.',
+   lessons:'The end of the study period is dominated by reinforced-concrete high-rises whose dominant risk is reinforcement corrosion, a useful contrast to the load-bearing masonry baseline.',
    references:['Raafat (2003)','Ministry of Tourism & Antiquities (2024)']}
 ];
-/* Hand-tuned Wikimedia Commons search terms per building — the raw name+location
+/* Hand-tuned Wikimedia Commons search terms per building, the raw name+location
    string is too specific for some, so these give the online image search its best
    chance of returning a real photograph. */
 const CASE_IMG_QUERY = {
@@ -858,7 +864,7 @@ function retrieveCaseStudies(building, drivers, maxN){
    scans have been indexed. This module is wired so that once real assets are
    uploaded and tagged with this same schema, retrieveMedia() will surface
    them automatically, matched to recommendations exactly like text retrieval
-   already works — without any other code needing to change. Per spec, this
+   already works, without any other code needing to change. Per spec, this
    module NEVER generates artificial images; it only ever displays retrieved
    entries from here. */
 const MEDIA_LIBRARY = [];
@@ -876,17 +882,17 @@ function retrieveMedia(tags, topN){
 /* ---------- Internet Image Retrieval Service ----------
    Falls back to real, trusted online sources when the local knowledge base
    (MEDIA_LIBRARY, above) has no matching asset for a given recommendation or
-   case study — per spec, priority is always: local KB first, online second.
+   case study, per spec, priority is always: local KB first, online second.
 
    Source: Wikimedia Commons (commons.wikimedia.org). It is a curated,
    trusted repository (used directly by UNESCO, museums and heritage bodies),
    every result is a real uploaded photograph/scan with its own attribution
    and license metadata, and its public API supports anonymous cross-origin
-   requests (origin=*) so it can be queried directly from this static page —
+   requests (origin=*) so it can be queried directly from this static page, 
    no API key, no server, no AI-generated imagery.
 
    Results are cached (in-memory + localStorage) so the same query is never
-   re-fetched needlessly, and the app still functions with no connection —
+   re-fetched needlessly, and the app still functions with no connection, 
    getImages() just returns a graceful "offline" status the UI can render. */
 const IMAGE_CACHE_KEY = 'hera_image_cache_v1';
 const IMAGE_CACHE_TTL_MS = 30*24*60*60*1000; // 30 days
@@ -895,12 +901,12 @@ function loadImageCache(){
   try{
     const raw = (typeof localStorage !== 'undefined') ? localStorage.getItem(IMAGE_CACHE_KEY) : null;
     state.imageCache = raw ? JSON.parse(raw) : {};
-  }catch(e){ state.imageCache = {}; } // corrupt/unavailable storage — degrade gracefully, don't crash
+  }catch(e){ state.imageCache = {}; } // corrupt/unavailable storage, degrade gracefully, don't crash
 }
 function persistImageCache(){
   try{
     if(typeof localStorage !== 'undefined') localStorage.setItem(IMAGE_CACHE_KEY, JSON.stringify(state.imageCache));
-  }catch(e){ /* storage full/unavailable (e.g. private browsing) — safe to ignore, cache stays in-memory */ }
+  }catch(e){ /* storage full/unavailable (e.g. private browsing), safe to ignore, cache stays in-memory */ }
 }
 function stripTags(html){
   return (html||'').replace(/<[^>]*>/g,'').replace(/\s+/g,' ').trim();
@@ -934,7 +940,7 @@ async function searchWikimediaImages(query, maxN){
    a "loading" entry immediately (so the UI can render a spinner without
    blocking), kicks off the real fetch in the background, and triggers a
    re-render once it resolves. Every call after that is served straight from
-   cache — no repeat network requests for the same query. */
+   cache, no repeat network requests for the same query. */
 function getImages(query, maxN){
   const key = imageCacheKey(query);
   const cached = state.imageCache[key];
@@ -1052,7 +1058,7 @@ function capSummary(plan){
     </div>
     <div class="hri-banner">
       <div>
-        <div style="font-size:12px;color:var(--muted);letter-spacing:.5px;">Risk Classification — ${a.scenarioLabel}</div>
+        <div style="font-size:12px;color:var(--muted);letter-spacing:.5px;">Risk Classification, ${a.scenarioLabel}</div>
         <div class="big">${a.hriCls.label}</div>
       </div>
       <div style="text-align:right;">
@@ -1063,17 +1069,17 @@ function capSummary(plan){
     <div class="twocol" style="margin-top:20px;">
       <div class="indicator-block">
         <div class="ihead"><span class="iname">Building</span></div>
-        <div class="rec-row"><b>${b.name}</b> — ${b.location}<br>Category: ${b.category||'—'} · Era: ${b.era||'—'} · Year: ${b.year||'—'}</div>
+        <div class="rec-row"><b>${b.name}</b>, ${b.location}<br>Category: ${b.category|| '-'} · Era: ${b.era|| '-'} · Year: ${b.year|| '-'}</div>
       </div>
       <div class="indicator-block">
         <div class="ihead"><span class="iname">Building Profile</span></div>
-        <div class="rec-row">Adaptive Reuse Function: <b>${b.use}</b><br>Building Material: <b>${b.material||'—'}</b><br>Selected Climate Scenario: <b>${a.scenarioLabel}</b></div>
+        <div class="rec-row">Adaptive Reuse Function: <b>${b.use}</b><br>Building Material: <b>${b.material|| '-'}</b><br>Selected Climate Scenario: <b>${a.scenarioLabel}</b></div>
       </div>
     </div>
     <div class="indicator-block">
       <div class="ihead"><span class="iname">Critical Indicators (${criticalIndicators.length})</span></div>
       ${criticalIndicators.length
-        ? criticalIndicators.map(ci=>`<span class="rec-chip" style="border-color:${ci.color};color:${ci.color};">${ci.name} — ${ci.score.toFixed(1)} (${ci.label})</span>`).join('')
+        ? criticalIndicators.map(ci=>`<span class="rec-chip" style="border-color:${ci.color};color:${ci.color};">${ci.name}, ${ci.score.toFixed(1)} (${ci.label})</span>`).join('')
         : `<div class="rec-row" style="color:var(--muted);">No individual indicator currently exceeds the Moderate risk threshold.</div>`}
     </div>
     <div class="note">This summary carries into every other tab below. Switch scenarios back on the Climate Scenarios step to regenerate the whole plan for a different future.</div>
@@ -1085,7 +1091,7 @@ function capStrategy(plan){
   return `
     <div class="future-block" style="margin-top:0;padding-top:0;border-top:none;">
       <h2 style="font-size:16px;">RAG-Grounded Baseline</h2>
-      <div class="sub" style="margin-bottom:8px;">Rule-based conservation category expanded with retrieved knowledge base sources — generated by HERA's existing RAG engine.</div>
+      <div class="sub" style="margin-bottom:8px;">Rule-based conservation category expanded with retrieved knowledge base sources, generated by HERA's existing RAG engine.</div>
       ${renderSolutionSection(generateLocalSolution(state.scenario))}
     </div>
     <div class="future-block">
@@ -1103,15 +1109,34 @@ function capStrategy(plan){
   `;
 }
 
+/* Visual guidance is a CHANGING variable: the illustrative photograph shown for
+   each issue is retrieved live and depends on the building's own critical
+   indicators and material, so it differs from one assessment to the next rather
+   than being a fixed standard image. This maps each issue's dominant tag to a
+   concrete, Wikimedia-searchable subject so the retrieval returns a relevant
+   photo instead of an empty result. */
+// Short, concrete subjects verified to return photographs on Wikimedia Commons.
+const VISUAL_QUERY = {
+  cracking:'masonry crack', materialdecay:'deteriorated stone',
+  surfaceloss:'eroded stone facade', biologicalgrowth:'lichen growth stone wall',
+  solar:'building shading louvers', humidity:'damp masonry',
+  saltcrystallization:'efflorescence wall', temperature:'sandstone weathering',
+  occupancy:'historic building museum visitors', masonry:'weathered stone wall'
+};
+function visualQueryFor(item){
+  const tags = item.evidence.flatMap(e=>e.tags);
+  const primary = tags.find(t=>VISUAL_QUERY[t]);
+  return primary ? VISUAL_QUERY[primary] : 'historic facade restoration';
+}
 /* ---------- Tab 3 · Visual Guidance ---------- */
 function capVisual(plan){
   return `
-    <div class="note">Local knowledge base assets are used first. Where none exist, HERA automatically retrieves real, non-AI-generated photographs from <b>Wikimedia Commons</b> — a trusted source used directly by UNESCO and heritage institutions — matched to each recommendation. Each result shows its caption, source and license, with a link to the original page.</div>
+    <div class="note">Visual guidance is a <b>changing variable</b>: the illustrative photograph for each issue is retrieved live from <b>Wikimedia Commons</b> (a trusted, non-AI source used by UNESCO and heritage institutions), chosen from this building's own dominant critical indicators, so it differs from one assessment to the next rather than being a fixed standard image. Each result shows its caption, source and license, with a link to the original page.</div>
     ${plan.items.map(item=>{
       const tags = item.evidence.flatMap(e=>e.tags);
       const localMedia = retrieveMedia(tags, 3);
       const top = item.evidence[0];
-      const query = `${item.issue} heritage conservation ${plan.a.b.material||''}`.trim();
+      const query = visualQueryFor(item);
       return `<div class="diagram-strip">
         <div class="diagram-title">${item.issue}</div>
         <div class="diagram-flow">
@@ -1120,7 +1145,7 @@ function capVisual(plan){
           <div class="diagram-step">${top ? top.source.split(',')[0] : (localMedia.length?'Local KB match':'Wikimedia Commons')}</div><div class="diagram-arrow">→</div>
           <div class="diagram-step">Image / Caption</div>
         </div>
-        <div class="diagram-caption">${top ? top.text : 'No matching text source in the current knowledge base — falling back to online image retrieval.'}</div>
+        <div class="diagram-caption">${top ? top.text : 'No matching text source in the current knowledge base, falling back to online image retrieval.'}</div>
         <div style="margin-top:14px;">
           ${localMedia.length
             ? `<div style="display:flex;gap:12px;flex-wrap:wrap;">${localMedia.map(m=>`<div style="cursor:pointer;" onclick="openCapModal('${m.id}')">${mediaPlaceholder(m.caption)}</div>`).join('')}</div>`
@@ -1140,7 +1165,7 @@ function capCases(plan){
     <div class="case-card">
       <div class="case-name">${cs.name}</div>
       <div class="case-loc">${cs.location}</div>
-      ${imageResultsHTML(query, 3, cs.name+' — no matching images found online')}
+      ${imageResultsHTML(query, 3, cs.name+', no matching images found online')}
       <div class="case-row"><b>Summary:</b> ${cs.summary}</div>
       <div class="case-row"><b>Applied Strategies:</b> ${cs.strategies.join('; ')}</div>
       <div class="case-row"><b>Lessons Learned:</b> ${cs.lessons}</div>
@@ -1210,7 +1235,7 @@ function capExplorer(){
   const groups = {};
   KNOWLEDGE_BASE.forEach(c=>{ const g = categoryOfChunk(c); (groups[g]=groups[g]||[]).push(c); });
   return `
-    <div class="note">Everything indexed by HERA's RAG engine so far, organized by category. Photographs, technical drawings, case study images and material datasheets will appear here automatically once a real media library is uploaded — none are indexed yet.</div>
+    <div class="note">Everything indexed by HERA's RAG engine so far, organized by category. Photographs, technical drawings, case study images and material datasheets will appear here automatically once a real media library is uploaded, none are indexed yet.</div>
     ${Object.keys(groups).map(g=>`
       <div class="indicator-block">
         <div class="ihead"><span class="iname">${icon('book',16)} ${g} (${groups[g].length})</span></div>
@@ -1225,7 +1250,7 @@ function capExplorer(){
     `).join('')}
     <div class="indicator-block">
       <div class="ihead"><span class="iname">${icon('image',16)} Photographs / Drawings / Datasheets (0 local)</span></div>
-      <div class="rec-row" style="color:var(--muted);">No visual or document-scan assets indexed locally yet — connect a media library to populate this section with priority local matches. In the meantime, Visual Guidance (Tab 3) and Case Studies (Tab 4) automatically fall back to live, non-AI-generated photographs from Wikimedia Commons.</div>
+      <div class="rec-row" style="color:var(--muted);">No visual or document-scan assets indexed locally yet, connect a media library to populate this section with priority local matches. In the meantime, Visual Guidance (Tab 3) and Case Studies (Tab 4) automatically fall back to live, non-AI-generated photographs from Wikimedia Commons.</div>
     </div>
   `;
 }
@@ -1233,7 +1258,7 @@ function capExplorer(){
 /* ---------- Tab 9 · Interactive Image Viewer ---------- */
 function capViewer(){
   return `
-    <div class="note">The Interactive Image Viewer opens a large modal with caption, source, section, and the related recommendation whenever an image is clicked elsewhere in this module. No photographs are indexed yet — click any text source below to preview how the modal behaves once real images are connected.</div>
+    <div class="note">The Interactive Image Viewer opens a large modal with caption, source, section, and the related recommendation whenever an image is clicked elsewhere in this module. No photographs are indexed yet, click any text source below to preview how the modal behaves once real images are connected.</div>
     <div style="display:flex;flex-wrap:wrap;gap:8px;">
       ${KNOWLEDGE_BASE.slice(0,6).map(c=>`<div class="rec-chip" style="cursor:pointer;padding:8px 12px;" onclick="openCapModal('${c.id}')">${c.source}</div>`).join('')}
     </div>
@@ -1254,7 +1279,7 @@ function pagePhase2(){
     <div class="cap-titlebar">
       <div class="accentbar"></div>
       <h2>Conservation Action Plan</h2>
-      <div class="sub">A structured, source-grounded implementation guide — ${plan.a.b.name}, ${plan.a.scenarioLabel} scenario.</div>
+      <div class="sub">A structured, source-grounded implementation guide, ${plan.a.b.name}, ${plan.a.scenarioLabel} scenario.</div>
     </div>
     <div class="cap-layout">
       ${pinnedSummary(plan)}
@@ -1283,6 +1308,7 @@ const state = {
   capModalId: null,
   pillarModal: null,
   workflowModal: false,
+  futureModal: false,
   caseModalId: null,
   isOnline: isOnline(),
   imageCache: {}
@@ -1324,11 +1350,11 @@ function barRow(name, val, weightLabel){
 
 /* ============================== PILLAR DETAIL POPUPS ==============================
    Click a framework card on the landing to flip open a centered modal detailing
-   each pillar's indicators, weightings and benchmark tables. Pure presentation —
+   each pillar's indicators, weightings and benchmark tables. Pure presentation, 
    the numbers mirror the scoring in data/formulas.js. */
 const PILLAR_DETAIL = {
   ess:{ code:'ESS', layer:'Hazard', name:'Environmental Stress Score',
-    intro:'The climate load acting on the historic fabric — measured today and re-projected under IPCC AR6 SSP pathways.',
+    intro:'The climate load acting on the historic fabric, measured today and re-projected under IPCC AR6 SSP pathways.',
     weightNote:'Three indicators, equally weighted at 33.3% each.',
     indicators:[
       {name:'Indoor Temperature', unit:'°C', weight:'33.3%', optimal:'20–24', acceptable:'18–27', critical:'outside 18–27'},
@@ -1336,7 +1362,7 @@ const PILLAR_DETAIL = {
       {name:'Solar Radiation', unit:'W/m²', weight:'33.3%', optimal:'< 200', acceptable:'200–500', critical:'> 500'}
     ]},
   bcs:{ code:'BCS', layer:'Vulnerability', name:'Building Condition Score',
-    intro:'How susceptible the building already is — the measured condition of the historic fabric itself.',
+    intro:'How susceptible the building already is, the measured condition of the historic fabric itself.',
     weightNote:'Four indicators, weighted by structural significance.',
     indicators:[
       {name:'Material Decay', unit:'category', weight:'40%', optimal:'None', acceptable:'Minor', critical:'Moderate–Severe'},
@@ -1345,7 +1371,7 @@ const PILLAR_DETAIL = {
       {name:'Biological Growth', unit:'category', weight:'10%', optimal:'None', acceptable:'Limited', critical:'Moderate–Severe'}
     ]},
   ois:{ code:'OIS', layer:'Exposure', name:'Occupancy Impact Score',
-    intro:'The operational pressure of adaptive reuse — visitor and event load acting on the building.',
+    intro:'The operational pressure of adaptive reuse, visitor and event load acting on the building.',
     weightNote:'Three indicators, equally weighted at 33.3% each.',
     indicators:[
       {name:'Occupancy Density', unit:'persons/m²', weight:'33.3%', optimal:'≤ 1', acceptable:'1–2', critical:'> 3'},
@@ -1353,7 +1379,7 @@ const PILLAR_DETAIL = {
       {name:'Event Frequency', unit:'category', weight:'33.3%', optimal:'Monthly', acceptable:'Weekly', critical:'Several/wk–Daily'}
     ]},
   hri:{ code:'HRI', layer:'Risk Index', name:'Heritage Risk Index',
-    intro:'The three assessed dimensions combined into a single 0–100 risk score — hazard and vulnerability weighted highest, per the framework\'s risk model.',
+    intro:'The three assessed dimensions combined into a single 0–100 risk score, hazard and vulnerability weighted highest, per the framework\'s risk model.',
     weightNote:'HRI = 0.40·ESS + 0.40·BCS + 0.20·OIS',
     indicators:[
       {name:'Environmental Stress', unit:'ESS · hazard', weight:'40%', optimal:'0–20', acceptable:'21–60', critical:'61–100'},
@@ -1362,10 +1388,10 @@ const PILLAR_DETAIL = {
     ]}
 };
 const PILLAR_REFERENCES = [
-  'Elmezayen, M. (2026). An AI-Assisted Heritage Risk Assessment and Decision-Support Framework — MSc Thesis Proposal, GIU.',
-  'IPCC (2021–2023). Sixth Assessment Report (AR6) — SSP climate scenario pathways.',
-  'UNESCO. Managing Disaster Risks for World Heritage — risk = hazard × vulnerability × exposure.',
-  'Cairo solar radiation climatology — en.tutiempo.net/solar-radiation/cairo.html.'
+  'Elmezayen, M. (2026). An AI-Assisted Heritage Risk Assessment and Decision-Support Framework, MSc Thesis Proposal, GIU.',
+  'IPCC (2021–2023). Sixth Assessment Report (AR6), SSP climate scenario pathways.',
+  'UNESCO. Managing Disaster Risks for World Heritage, risk = hazard × vulnerability × exposure.',
+  'Cairo solar radiation climatology, en.tutiempo.net/solar-radiation/cairo.html.'
 ];
 const RISK_BANDS_DISPLAY = [
   {range:'0–20', label:'Very Low', priority:'Routine Monitoring'},
@@ -1436,7 +1462,7 @@ function startAssessment(){
    getImages cache/retrieval). Manual uploads take priority when present. */
 function collectBuildingImages(b){
   if(b.images && b.images.length){
-    return {status:'ready', list:b.images.map((im,i)=>({url:im.url, caption:im.name||`${b.name} — image ${i+1}`, link:null}))};
+    return {status:'ready', list:b.images.map((im,i)=>({url:im.url, caption:im.name||`${b.name}, image ${i+1}`, link:null}))};
   }
   const q = `${b.name||''} ${b.location||''}`.trim();
   if(!q) return {status:'empty', list:[]};
@@ -1484,15 +1510,15 @@ function pinnedSummary(plan){
         <div class="pin-arrow right" onmouseenter="stripHoverStart('pinTrack',1)" onmouseleave="stripHoverStop()" onclick="stripStep('pinTrack',1)">${icon('arrowRight',18)}</div>`:''}`;
   } else {
     const msg = imgs.status==='loading' ? 'Searching Wikimedia Commons…'
-      : imgs.status==='offline' ? 'Offline — add images in Building Info'
-      : (!b.name ? 'Add a building name to fetch images' : 'No images found — add your own in Building Info');
+      : imgs.status==='offline' ? 'Offline, add images in Building Info'
+      : (!b.name ? 'Add a building name to fetch images' : 'No images found, add your own in Building Info');
     gallery = `<div class="pin-empty">${icon('image',30)}<span>${msg}</span></div>`;
   }
   return `<aside class="cap-pin">
     <div class="pin-gallery">${gallery}</div>
     <div class="pin-body">
       <div class="pin-title">${b.name||'Untitled building'}</div>
-      <div class="pin-loc">${icon('pin',13)} ${b.location||'—'}</div>
+      <div class="pin-loc">${icon('pin',13)} ${b.location|| '-'}</div>
       <div class="pin-hri">
         <div class="pin-score" style="color:${color}">${a.hri.toFixed(1)}</div>
         <div class="pin-hri-meta">
@@ -1503,8 +1529,8 @@ function pinnedSummary(plan){
       <div class="pin-rows">
         <div class="pin-row"><span>Scenario</span><b>${a.scenarioLabel}</b></div>
         <div class="pin-row"><span>Dominant driver</span><b>${a.drivers.join(' + ')}</b></div>
-        <div class="pin-row"><span>Adaptive reuse</span><b>${b.use||'—'}</b></div>
-        <div class="pin-row"><span>Material</span><b>${b.material||'—'}</b></div>
+        <div class="pin-row"><span>Adaptive reuse</span><b>${b.use|| '-'}</b></div>
+        <div class="pin-row"><span>Material</span><b>${b.material|| '-'}</b></div>
       </div>
       <div class="pin-crit">
         <div class="pin-crit-h">Critical indicators · ${criticalIndicators.length}</div>
@@ -1574,7 +1600,26 @@ function capCasesGallery(plan){
         </article>`;
       }).join('')}
     </div>
-    <div class="gal-foot">Comparators for framework transferability across adaptive-reuse heritage buildings of the 1880–1940 period. Photographs retrieved live from Wikimedia Commons — no AI-generated imagery. Sources: ${CASE_STUDY_CITATIONS}.</div>`;
+    <div class="gal-foot">Comparators for framework transferability across adaptive-reuse heritage buildings of the 1880–1940 period. Photographs retrieved live from Wikimedia Commons, no AI-generated imagery. Sources: ${CASE_STUDY_CITATIONS}.</div>`;
+}
+
+/* ---------- Case-study photo gallery (title + subtitle under each image) ---------- */
+function caseGalleryHTML(query, cs){
+  const entry = getImages(query, 6);
+  if(entry.status==='loading') return `<div class="media-placeholder"><div class="media-placeholder-icon">${icon('search',26)}</div><div class="media-placeholder-text">Searching Wikimedia Commons for photographs…</div></div>`;
+  if(entry.status==='offline') return `<div class="media-placeholder"><div class="media-placeholder-icon">${icon('wifiOff',26)}</div><div class="media-placeholder-text">Offline. Connect to the internet to load photographs.</div></div>`;
+  if(entry.status==='error') return `<div class="media-placeholder"><div class="media-placeholder-icon">${icon('alert',26)}</div><div class="media-placeholder-text">${entry.error}</div></div><button class="cg-retry" onclick='retryImages(${JSON.stringify(query)},6)'>${icon('refresh',14)} Retry</button>`;
+  if(entry.status==='empty' || !entry.images.length) return `<div class="media-placeholder"><div class="media-placeholder-icon">${icon('image',26)}</div><div class="media-placeholder-text">No photographs found on Wikimedia Commons for ${cs.name}.</div></div>`;
+  return `<div class="cg-grid">${entry.images.map(img=>`
+    <figure class="cg-item">
+      <a class="cg-thumb" href="${img.descriptionUrl}" target="_blank" rel="noopener noreferrer" title="View original on Wikimedia Commons">
+        <img src="${img.thumbUrl}" alt="${(img.title||'').replace(/"/g,'&quot;')}" loading="lazy" onerror="this.closest('.cg-item').style.display='none'">
+      </a>
+      <figcaption>
+        <span class="cg-title">${img.title}</span>
+        <span class="cg-sub">${img.source} · ${img.license}</span>
+      </figcaption>
+    </figure>`).join('')}</div>`;
 }
 
 /* ---------- Case-study detail modal (pictures + data) ---------- */
@@ -1591,7 +1636,7 @@ function caseStudyModalHTML(){
         </div>
         <button class="ghost pill-x" onclick="closeCaseStudy()">${icon('close',16)}</button>
       </div>
-      <div class="case-gallery">${imageResultsHTML(csImgQuery(cs), 6, cs.name+' — no photographs found on Wikimedia Commons')}</div>
+      <div class="case-gallery">${caseGalleryHTML(csImgQuery(cs), cs)}</div>
       <div class="case-data">
         <p class="case-summary">${cs.summary}</p>
         <div class="case-cols">
@@ -1631,7 +1676,7 @@ function setupReveals(){
    markup ships empty (only a blinking caret) so this is what fills it. Respects
    prefers-reduced-motion by painting the final state immediately. */
 const TW_TEXT = 'A decision-support framework for heritage under climate change.';
-const TW_EMPH = 'heritage';   // rendered italic + accent while typing
+const TW_EMPH = 'decision-support framework';   // rendered italic + accent while typing
 function twHTML(n){
   // Return the first n characters of TW_TEXT with the emphasized word wrapped,
   // so the accent word keeps its styling as it is progressively revealed.
@@ -1664,9 +1709,13 @@ function setupTypewriter(){
   };
   if(reduced || typeof IntersectionObserver === 'undefined'){ start(); return; }
   _twObs = new IntersectionObserver((entries)=>{
-    entries.forEach(e=>{ if(e.isIntersecting){ start(); _twObs.disconnect(); _twObs = null; } });
-  }, {threshold:0.5});
+    entries.forEach(e=>{ if(e.isIntersecting){ start(); if(_twObs){ _twObs.disconnect(); _twObs = null; } } });
+  }, {threshold:0.35});
   _twObs.observe(el);
+  // Safety net: if the observer never fires (layout quirk, threshold never met),
+  // still type + reveal so the paragraph and Start Assessment button can never
+  // stay stuck in their faded pre-reveal state.
+  setTimeout(start, 3500);
 }
 
 /* ---------- Sidebar rail (persistent step navigation) ---------- */
@@ -1769,18 +1818,22 @@ function removeProject(id){
 function heroRoute(){
   // Wadi-Rum-style trek line: the assessment pipeline as an expedition route.
   const nodes = [
-    {x:24,  y:168, n:'01', l:'ESS', d:'Environmental'},
-    {x:132, y:74,  n:'02', l:'BCS', d:'Condition'},
-    {x:236, y:132, n:'03', l:'OIS', d:'Occupancy'},
-    {x:320, y:52,  n:'04', l:'HRI', d:'Risk Index'}
+    {x:24,  y:168, n:'01', l:'ESS', d:'Environmental', id:'ess'},
+    {x:132, y:74,  n:'02', l:'BCS', d:'Condition',     id:'bcs'},
+    {x:236, y:132, n:'03', l:'OIS', d:'Occupancy',     id:'ois'},
+    {x:320, y:52,  n:'04', l:'HRI', d:'Risk Index',    id:'hri'}
   ];
   const dots = nodes.map(p=>`
-    <circle cx="${p.x}" cy="${p.y}" r="11" fill="none" stroke="rgba(255,255,255,.35)"/>
-    <circle cx="${p.x}" cy="${p.y}" r="4.5" fill="#fff"/>
-    <text x="${p.x+16}" y="${p.y-4}" fill="#fff" font-size="12" class="wp-label">${p.n} · ${p.l}</text>
-    <text x="${p.x+16}" y="${p.y+10}" fill="rgba(255,255,255,.7)" font-size="10" class="wp-day">${p.d}</text>
+    <g class="wp-node" role="button" tabindex="0" aria-label="${p.l}, ${p.d}"
+       onclick="openPillar('${p.id}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openPillar('${p.id}')}">
+      <circle class="wp-hit" cx="${p.x}" cy="${p.y}" r="18" fill="transparent"/>
+      <circle class="wp-ring" cx="${p.x}" cy="${p.y}" r="11" fill="none" stroke="rgba(255,255,255,.35)" stroke-width="1.5"/>
+      <circle class="wp-dot" cx="${p.x}" cy="${p.y}" r="4.5" fill="#fff"/>
+      <text x="${p.x+16}" y="${p.y-4}" fill="#fff" font-size="12" class="wp-label">${p.n} · ${p.l}</text>
+      <text x="${p.x+16}" y="${p.y+10}" fill="rgba(255,255,255,.7)" font-size="10" class="wp-day">${p.d}</text>
+    </g>
   `).join('');
-  return `<div class="hero-route" aria-hidden="true">
+  return `<div class="hero-route">
     <svg viewBox="0 0 360 210" fill="none">
       <path d="M24,168 C78,132 74,74 132,74 C186,74 188,140 236,132 C286,124 300,84 320,52"
         stroke="rgba(255,255,255,.5)" stroke-width="1.6" stroke-dasharray="4 6" stroke-linecap="round"/>
@@ -1824,7 +1877,7 @@ function pageHome(){
         <span class="eyebrow">What is HERA</span>
         <h2 id="twTarget" class="tw"><span class="tw-type"></span><span class="tw-caret"></span></h2>
         <p class="tw-after">HERA reads environmental stress, building condition and occupancy into a single Heritage Risk
-        Index — projected forward under IPCC climate scenarios — and turns that score into a prioritized,
+        Index, projected forward under IPCC climate scenarios, and turns that score into a prioritized,
         source-grounded conservation plan for adaptive-reuse heritage buildings.</p>
         <button class="btn-solid tw-after" onclick="startAssessment()"><span>Start Assessment</span> ${icon('arrowRight',17)}</button>
       </div>
@@ -1837,8 +1890,8 @@ function pageHome(){
           <span class="eyebrow">The Framework</span>
           <h2>Four measures, one <em>defensible</em> index.</h2>
           <p>HERA layers three assessed dimensions into a single Heritage Risk Index, then translates that
-          score into a concrete, source-grounded conservation response — not generic advice.</p>
-          <button class="workflow-open" onclick="openWorkflow()">${icon('spark',15)} See the interactive 4-step workflow</button>
+          score into a concrete, source-grounded conservation response, not generic advice.</p>
+          <button class="workflow-open" onclick="openWorkflow()">${icon('spark',15)} 4-step workflow</button>
         </div>
         ${n ? `<div class="note" style="margin-bottom:26px;"><b>${n} building${n>1?'s':''}</b> saved for comparison. Open <b>Compare buildings</b> to see which needs intervention first.</div>` : ''}
         <div class="frame-grid">
@@ -1847,7 +1900,7 @@ function pageHome(){
             <div class="fnum">01</div><div class="frule"></div>
             <div class="ftag">ESS · Hazard</div>
             <h3>Environmental Stress</h3>
-            <p>Temperature, relative humidity and solar radiation — the climate load acting on the fabric.</p>
+            <p>Temperature, relative humidity and solar radiation, the climate load acting on the fabric.</p>
             <span class="flip-hint">${icon('search',13)} Indicators &amp; benchmarks</span>
           </div>
           <div class="frame-card reveal flip-card" onclick="openPillar('bcs')" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openPillar('bcs')}">
@@ -1855,7 +1908,7 @@ function pageHome(){
             <div class="fnum">02</div><div class="frule"></div>
             <div class="ftag">BCS · Vulnerability</div>
             <h3>Building Condition</h3>
-            <p>Material decay, cracking, surface loss and biological growth — how susceptible the building is.</p>
+            <p>Material decay, cracking, surface loss and biological growth, how susceptible the building is.</p>
             <span class="flip-hint">${icon('search',13)} Indicators &amp; benchmarks</span>
           </div>
           <div class="frame-card reveal flip-card" onclick="openPillar('ois')" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openPillar('ois')}">
@@ -1863,7 +1916,7 @@ function pageHome(){
             <div class="fnum">03</div><div class="frule"></div>
             <div class="ftag">OIS · Exposure</div>
             <h3>Occupancy Impact</h3>
-            <p>Density, visitor load and event frequency — the operational pressure of adaptive reuse.</p>
+            <p>Density, visitor load and event frequency, the operational pressure of adaptive reuse.</p>
             <span class="flip-hint">${icon('search',13)} Indicators &amp; benchmarks</span>
           </div>
           <div class="frame-card reveal flip-card" onclick="openPillar('hri')" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openPillar('hri')}">
@@ -1871,25 +1924,18 @@ function pageHome(){
             <div class="fnum">04</div><div class="frule"></div>
             <div class="ftag">HRI · Risk Index</div>
             <h3>Heritage Risk Index</h3>
-            <p>The three measures combined into one 0–100 score — 0.40·ESS + 0.40·BCS + 0.20·OIS.</p>
+            <p>The three measures combined into one 0–100 score, 0.40·ESS + 0.40·BCS + 0.20·OIS.</p>
             <span class="flip-hint">${icon('search',13)} Weightings &amp; classification</span>
           </div>
-          <div class="frame-card wide o5 reveal">
-            <div class="o5-top">
-              <div class="fw-l">
-                <div class="ftag">05 · Climate Scenarios → Future HRI</div>
-                <h3>What will the risk be in <em>2100</em>?</h3>
-                <p>HERA projects today's Heritage Risk Index forward through IPCC AR6 climate pathways to
-                estimate the <b>Future HRI</b> — and the conservation strategy it calls for.</p>
-              </div>
-              <button class="btn-hero" onclick="startAssessment()">Start with a building ${icon('arrowRight',17)}</button>
-            </div>
-            <div class="hri-flow" aria-label="Future HRI projection">
-              <span class="hf-node">Current HRI</span>
-              <span class="hf-arrow">${icon('arrowRight',18)}</span>
-              <span class="hf-node mid">IPCC AR6 pathways<b>SSP2-4.5 · SSP5-8.5</b></span>
-              <span class="hf-arrow">${icon('arrowRight',18)}</span>
-              <span class="hf-node strong">Future HRI</span>
+          <div class="frame-card wide o5 reveal flip-card" onclick="openFuture()" tabindex="0"
+            onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openFuture()}">
+            <div class="fico">${icon('climate',26)}</div>
+            <div class="fw-l">
+              <div class="ftag">05 · Climate Scenarios → Future HRI</div>
+              <h3>What will the risk be in <em>2100</em>?</h3>
+              <p>HERA projects today's Heritage Risk Index forward through IPCC AR6 climate pathways to
+              estimate the <b>Future HRI</b>, and the conservation strategy it calls for.</p>
+              <span class="flip-hint light">${icon('search',13)} See the projection logic</span>
             </div>
           </div>
         </div>
@@ -1897,6 +1943,7 @@ function pageHome(){
     </section>
     ${pillarModalHTML()}
     ${workflowModalHTML()}
+    ${futureModalHTML()}
   </div>`;
 }
 
@@ -1916,6 +1963,42 @@ function workflowModalHTML(){
 function openWorkflow(){ state.workflowModal = true; render(); }
 function closeWorkflow(){ state.workflowModal = false; render(); }
 
+/* ---------- Future-HRI projection modal (opened from the "05" card) ---------- */
+function futureModalHTML(){
+  if(!state.futureModal) return '';
+  return `<div class="modal-overlay future-overlay" onclick="if(event.target===this)closeFuture()">
+    <div class="future-box">
+      <div class="future-head">
+        <div><span class="eyebrow">05 · Climate Scenarios</span><h3>How the Future HRI is projected</h3></div>
+        <button class="ghost pill-x" onclick="closeFuture()">${icon('close',16)}</button>
+      </div>
+      <p class="future-intro">Today's Heritage Risk Index is re-run through the IPCC AR6 climate engine. Each pathway
+      shifts temperature, humidity and solar radiation, which drives a projected environmental stress and, in turn,
+      a projected building condition, yielding the Future HRI.</p>
+      <div class="fdiag">
+        <div class="fd-node start">Current Heritage Risk Index (HRI)</div>
+        <div class="fd-arr">${icon('arrowRight',18)}</div>
+        <div class="fd-node engine">${icon('climate',15)} Climate Scenario Engine · IPCC AR6</div>
+        <div class="fd-branch">
+          <span class="fd-chip">Current Conditions</span>
+          <span class="fd-chip a">SSP2-4.5 · Moderate</span>
+          <span class="fd-chip b">SSP5-8.5 · Severe</span>
+        </div>
+        <div class="fd-arr">${icon('arrowRight',18)}</div>
+        <div class="fd-node">Projected Climate Conditions<span>Temperature · Relative Humidity · Solar Radiation</span></div>
+        <div class="fd-arr">${icon('arrowRight',18)}</div>
+        <div class="fd-node">Projected Environmental Stress (ESS)</div>
+        <div class="fd-arr">${icon('arrowRight',18)}</div>
+        <div class="fd-node">Projected Building Condition (BCS)<span>Material decay · Cracking · Surface loss · Biological growth</span></div>
+        <div class="fd-arr">${icon('arrowRight',18)}</div>
+        <div class="fd-node end">Future Heritage Risk Index (Future HRI)</div>
+      </div>
+    </div>
+  </div>`;
+}
+function openFuture(){ state.futureModal = true; render(); }
+function closeFuture(){ state.futureModal = false; render(); }
+
 function pageBuilding(){
   const b = state.building;
   const categories = ['Palace','Villa','Landmark Building','Religious Building','Public/Civic Building','Other'];
@@ -1924,7 +2007,7 @@ function pageBuilding(){
   return `<div class="card">
     <div class="accentbar"></div>
     <h2>Building Information</h2>
-    <div class="sub">Think of this like opening a project file — defines scope for this adaptive reuse heritage building.</div>
+    <div class="sub">Think of this like opening a project file, defines scope for this adaptive reuse heritage building.</div>
     <div class="grid">
       <div class="field"><label>Building Name</label><input type="text" value="${b.name}" oninput="state.building.name=this.value"></div>
       <div class="field"><label>Location</label><input type="text" value="${b.location}" oninput="state.building.location=this.value"></div>
@@ -1956,16 +2039,16 @@ function pageBuilding(){
     </div>
 
     <div class="field" style="margin-top:6px;">
-      <label>Building Images <span class="hint" style="font-weight:400;">— shown in the Conservation Action Plan summary</span></label>
+      <label>Building Images <span class="hint" style="font-weight:400;">, shown in the Conservation Action Plan summary</span></label>
       <div class="img-upload">
         <label class="img-upload-btn">${icon('image',16)} Upload images<input type="file" accept="image/*" multiple style="display:none" onchange="addBuildingImages(this)"></label>
-        <span class="img-upload-note">Optional — if left empty, HERA searches Wikimedia Commons for “<b>${b.name||'building name'}</b>”.</span>
+        <span class="img-upload-note">Optional, if left empty, HERA searches Wikimedia Commons for “<b>${b.name||'building name'}</b>”.</span>
       </div>
       ${(b.images && b.images.length) ? `<div class="img-thumbs">${b.images.map((im,i)=>`
         <span class="img-thumb"><img src="${im.url}" alt=""><button title="Remove" onclick="removeBuildingImage(${i})">${icon('close',12)}</button></span>`).join('')}</div>` : ''}
     </div>
 
-    <div class="note"><b>Scope note:</b> This framework targets late Khedival/Colonial-era load-bearing masonry buildings (1880–1940) in Egypt's hot-arid climate — see your era-boundary rationale slide for the full justification.</div>
+    <div class="note"><b>Scope note:</b> This framework targets late Khedival/Colonial-era load-bearing masonry buildings (1880–1940) in Egypt's hot-arid climate, see your era-boundary rationale slide for the full justification.</div>
   </div>${navRow(0,2)}`;
 }
 
@@ -1976,7 +2059,7 @@ function pageESS(){
   return `<div class="card">
     <div class="accentbar"></div>
     <h2>Environmental Stress Assessment (ESS)</h2>
-    <div class="sub">Hazard layer — equal weighting (33.3% each) across all three indicators.</div>
+    <div class="sub">Hazard layer, equal weighting (33.3% each) across all three indicators.</div>
 
     ${geoPanel()}
 
@@ -2016,7 +2099,7 @@ function pageBCS(){
   return `<div class="card">
     <div class="accentbar"></div>
     <h2>Building Condition Assessment (BCS)</h2>
-    <div class="sub">Vulnerability layer — weighted: Material Decay 40% · Cracking 30% · Surface Loss 20% · Biological Growth 10%.</div>
+    <div class="sub">Vulnerability layer, weighted: Material Decay 40% · Cracking 30% · Surface Loss 20% · Biological Growth 10%.</div>
 
     <div class="twocol">
       <div class="indicator-block">
@@ -2026,7 +2109,7 @@ function pageBCS(){
         </select>
       </div>
       <div class="indicator-block">
-        <div class="ihead"><span class="iname">Cracking — Width (mm)</span><span class="iweight">30%</span></div>
+        <div class="ihead"><span class="iname">Cracking, Width (mm)</span><span class="iweight">30%</span></div>
         <input type="number" step="0.1" value="${i.crack}" oninput="state.bcs.crack=parseFloat(this.value)||0" onchange="render()">
       </div>
       <div class="indicator-block">
@@ -2060,7 +2143,7 @@ function pageOIS(){
   return `<div class="card">
     <div class="accentbar"></div>
     <h2>Occupancy Impact Assessment (OIS)</h2>
-    <div class="sub">Exposure layer — equal weighting (33.3% each), non-climatic operational stressor.</div>
+    <div class="sub">Exposure layer, equal weighting (33.3% each), non-climatic operational stressor.</div>
 
     <div class="indicator-block">
       <div class="ihead"><span class="iname">Occupancy Density (persons/m²)</span><span class="iweight">33.3%</span></div>
@@ -2097,7 +2180,7 @@ function pageResults(){
   return `<div class="card">
     <div class="accentbar"></div>
     <h2>Current Heritage Risk Index</h2>
-    <div class="sub">${state.building.name} — ${state.building.location}</div>
+    <div class="sub">${state.building.name}, ${state.building.location}</div>
 
     <div class="score-row">
       ${scoreCard('ESS', essR.score, BANDS_GENERIC)}
@@ -2142,10 +2225,13 @@ function buildCiteMap(chunks){
 }
 function citeChips(refs, citeMap){
   if(!refs || !refs.length) return '';
+  // NB: this markup is emitted INSIDE a <p>. Block-level <div>s inside a <p> get
+  // auto-closed by the HTML parser, which orphaned the tooltip content (it showed
+  // up empty). Using inline <span>s (display:block via CSS) keeps the tooltip valid.
   return refs.map(c=>`<span class="cite" tabindex="0"><sup>${citeMap.get(c.id)}</sup><span class="cite-card">
-    <div class="cite-card-title">${c.source}</div>
-    <div class="cite-card-text">${c.text}</div>
-    <div class="cite-card-link">View source</div>
+    <span class="cite-card-title">${c.source}</span>
+    <span class="cite-card-text">${c.text}</span>
+    <span class="cite-card-link">View source</span>
   </span></span>`).join('');
 }
 
@@ -2184,9 +2270,9 @@ function renderSolutionSection(sol){
     <div class="indicator-block">
       <div class="ihead"><span class="iname">Sources</span></div>
       ${sol.references.length ? `<div style="font-size:12.5px;line-height:2;">${sol.references.map((c,i)=>`<div><span class="cite" tabindex="0"><sup>${i+1}</sup><span class="cite-card">
-        <div class="cite-card-title">${c.source}</div>
-        <div class="cite-card-text">${c.text}</div>
-        <div class="cite-card-link">View source</div>
+        <span class="cite-card-title">${c.source}</span>
+        <span class="cite-card-text">${c.text}</span>
+        <span class="cite-card-link">View source</span>
       </span></span> ${c.source}</div>`).join('')}</div>` : '<div style="font-size:12px;color:var(--muted);">No knowledge base matches for this assessment.</div>'}
     </div>
   </div>`;
@@ -2219,7 +2305,7 @@ function pageClimate(){
     <div class="indicator-block" style="margin-bottom:18px;">
       <div class="ihead"><span class="iname">${icon('globe',16)} What is an SSP?</span></div>
       <p style="font-size:13.5px;line-height:1.7;">
-        <b>SSP</b> stands for <b>Shared Socioeconomic Pathway</b> — one of the future-scenario narratives used by the <b>IPCC</b> (Intergovernmental Panel on Climate Change) in its <b>AR6</b> (Sixth Assessment Report, 2021–2023). The first number identifies the socioeconomic storyline (SSP2 = "Middle of the Road," SSP5 = "Fossil-fueled Development"); the number after the dash is the approximate radiative forcing by 2100 in W/m² — higher means stronger warming. <b>SSP2-4.5</b> and <b>SSP5-8.5</b> are <b>independent, alternative futures, not sequential steps</b> — each is projected separately onto the same Current HRI baseline, so the three tabs below are parallel "what-if" branches rather than a single timeline.
+        <b>SSP</b> stands for <b>Shared Socioeconomic Pathway</b>, one of the future-scenario narratives used by the <b>IPCC</b> (Intergovernmental Panel on Climate Change) in its <b>AR6</b> (Sixth Assessment Report, 2021–2023). The first number identifies the socioeconomic storyline (SSP2 = "Middle of the Road," SSP5 = "Fossil-fueled Development"); the number after the dash is the approximate radiative forcing by 2100 in W/m², higher means stronger warming. <b>SSP2-4.5</b> and <b>SSP5-8.5</b> are <b>independent, alternative futures, not sequential steps</b>, each is projected separately onto the same Current HRI baseline, so the three tabs below are parallel "what-if" branches rather than a single timeline.
       </p>
     </div>
 
@@ -2241,7 +2327,7 @@ function pageClimate(){
     </table>
 
     <div class="future-block">
-      <h2 style="font-size:18px;">Decision Matrix — ${sel.label}</h2>
+      <h2 style="font-size:18px;">Decision Matrix, ${sel.label}</h2>
       <div class="sub" style="margin-bottom:8px;">Dominant risk driver: <b style="color:var(--purple2)">${drivers.join(' + ')}</b></div>
       <div class="strategy-box">
         <div class="cat">${selCls.priority} · HRI ${sel.hri.toFixed(1)} (${selCls.label})</div>
@@ -2250,7 +2336,7 @@ function pageClimate(){
       </div>
     </div>
 
-    <div class="note">This category and dominant driver, for the scenario selected above, is what feeds the <b>Conservation Strategy</b> step next — continue to generate a fully tailored, source-cited action plan.</div>
+    <div class="note">This category and dominant driver, for the scenario selected above, is what feeds the <b>Conservation Strategy</b> step next, continue to generate a fully tailored, source-cited action plan.</div>
   </div>${navRow(5,7)}`;
 }
 
@@ -2272,7 +2358,7 @@ function pageStrategy(){
   return `<div class="card">
     <div class="accentbar"></div>
     <h2>Conservation Strategy</h2>
-    <div class="sub">A defensible, source-cited action plan for ${sel.label} — retrieved from HERA's local knowledge base of conservation guidelines and precedent case studies, matched to this building's own risk drivers and indicator readings.</div>
+    <div class="sub">A defensible, source-cited action plan for ${sel.label}, retrieved from HERA's local knowledge base of conservation guidelines and precedent case studies, matched to this building's own risk drivers and indicator readings.</div>
 
     ${renderSolutionSection(generateLocalSolution(state.scenario))}
 
@@ -2291,9 +2377,9 @@ function pageStrategy(){
         return `<div class="sub" style="margin-bottom:8px;">Sends HERA's matched knowledge base passages along with the assessment, so the AI's answer is grounded in and cites the same sources used in the Generated Solution above.</div>
         ${matched.length ? `<div class="indicator-block" style="margin-bottom:16px;">
           <div class="ihead"><span class="iname">${icon('book',16)} Matched knowledge base sources (${matched.length})</span></div>
-          ${matched.map(c=>`<div style="font-size:12px;color:var(--muted);margin-bottom:8px;"><b style="color:var(--purple2);">${c.source}</b> — ${c.text}</div>`).join('')}
+          ${matched.map(c=>`<div style="font-size:12px;color:var(--muted);margin-bottom:8px;"><b style="color:var(--purple2);">${c.source}</b>, ${c.text}</div>`).join('')}
         </div>` : ''}`;
-      })() : `<div class="sub" style="margin-bottom:8px;">Skips HERA's knowledge base entirely and instructs the AI to draw on its own general training knowledge of UNESCO/ICOMOS literature instead — use this if you want an independent cross-check rather than a HERA-grounded answer.</div>`}
+      })() : `<div class="sub" style="margin-bottom:8px;">Skips HERA's knowledge base entirely and instructs the AI to draw on its own general training knowledge of UNESCO/ICOMOS literature instead, use this if you want an independent cross-check rather than a HERA-grounded answer.</div>`}
 
       <button class="primary" onclick="state.showPrompt=!state.showPrompt;render()">${state.showPrompt ? 'Hide Prompt' : `${icon('spark',16)} Generate Full AI Prompt`}</button>
       ${state.showPrompt ? `
@@ -2306,7 +2392,7 @@ function pageStrategy(){
         </div>` : ''}
     </div>
 
-    <div class="phase2"><b>RAG retrieval active:</b> HERA produces the conservation solution above directly from a local knowledge base paraphrased from Sesana et al. 2021 and the UNESCO Disaster Risk Management manual, auto-matched to this building's risk drivers. The AI Prompt Generator remains available for a second opinion — either grounded in the same knowledge base, or fully external for independent validation. <b>Next milestone:</b> expand the knowledge base with ICOMOS charters, Feilden, and Egyptian/Baron Palace-specific restoration reports, and move from keyword tag-matching to full semantic retrieval.</div>
+    <div class="phase2"><b>RAG retrieval active:</b> HERA produces the conservation solution above directly from a local knowledge base paraphrased from Sesana et al. 2021 and the UNESCO Disaster Risk Management manual, auto-matched to this building's risk drivers. The AI Prompt Generator remains available for a second opinion, either grounded in the same knowledge base, or fully external for independent validation. <b>Next milestone:</b> expand the knowledge base with ICOMOS charters, Feilden, and Egyptian/Baron Palace-specific restoration reports, and move from keyword tag-matching to full semantic retrieval.</div>
   </div>${navRow(6,8)}`;
 }
 
@@ -2315,7 +2401,7 @@ function pageCompare(){
   return `<div class="card">
     <div class="accentbar"></div>
     <h2>Building Comparison & Resource Prioritization</h2>
-    <div class="sub">For when you're managing several adaptive reuse heritage buildings with limited resources — see, at a glance, which ones need immediate mediation or intervention first.</div>
+    <div class="sub">For when you're managing several adaptive reuse heritage buildings with limited resources, see, at a glance, which ones need immediate mediation or intervention first.</div>
 
     ${list.length === 0 ? `
       <div class="note">No buildings saved yet. Run an assessment, then click <b>Save to Comparison</b> on the Results page to add it here.</div>
@@ -2346,7 +2432,7 @@ function pageCompare(){
         ${list.map(p=>barRow(p.building.name, p.hri, p.band)).join('')}
       </div>
 
-      <div class="note"><b>How to read this:</b> Buildings are ranked by Heritage Risk Index (HRI), highest first. With limited resources, prioritize intervention on the building(s) at the top of the list — especially those flagged Critical or High Risk — before addressing lower-risk buildings.</div>
+      <div class="note"><b>How to read this:</b> Buildings are ranked by Heritage Risk Index (HRI), highest first. With limited resources, prioritize intervention on the building(s) at the top of the list, especially those flagged Critical or High Risk, before addressing lower-risk buildings.</div>
 
       <div class="navrow"><span></span><button class="primary" onclick="newAssessment()">+ Add Another Building</button></div>
     `}
@@ -2364,7 +2450,7 @@ function navRow(prev, next){
 let _lastStepKey = null;
 function render(){
   const pages = [pageHome, pageBuilding, pageESS, pageBCS, pageOIS, pageResults, pageClimate, pagePhase2];
-  // Step 0 is the cinematic landing — rendered full-bleed with its own top nav,
+  // Step 0 is the cinematic landing, rendered full-bleed with its own top nav,
   // no sidebar. Every other step (and the compare view) uses the app shell.
   if(!state.compareView && state.step===0){
     _lastStepKey = 'step0';
@@ -2377,7 +2463,7 @@ function render(){
   }
   unmountFeatureCarousel();
   // Only play the page-swap entrance animation when the step (or view) actually
-  // changes — not on the many in-page re-renders (typing, tab switches, geo
+  // changes, not on the many in-page re-renders (typing, tab switches, geo
   // fetches), which would otherwise re-animate the whole column on every input.
   const stepKey = state.compareView ? 'compare' : 'step'+state.step;
   const swap = stepKey !== _lastStepKey;
@@ -2394,10 +2480,10 @@ Object.assign(window, {
   openPillar, closePillar, startAssessment,
   addBuildingImages, removeBuildingImage,
   stripHoverStart, stripHoverStop, stripStep,
-  openWorkflow, closeWorkflow, openCaseStudy, closeCaseStudy
+  openWorkflow, closeWorkflow, openCaseStudy, closeCaseStudy, openFuture, closeFuture
 });
 /* ============================== CONNECTIVITY ============================== */
-loadImageCache(); // populate state.imageCache from localStorage, if available — degrades gracefully if not
+loadImageCache(); // populate state.imageCache from localStorage, if available, degrades gracefully if not
 window.addEventListener('online', ()=>{ state.isOnline = true; render(); });
 window.addEventListener('offline', ()=>{ state.isOnline = false; render(); });
 

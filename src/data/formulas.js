@@ -1,5 +1,5 @@
 /* ============================== DATA & FORMULAS ============================== */
-/* Sourced directly from: Mariam Elmezayen's MSc Thesis Proposal — */
+/* Sourced directly from: Mariam Elmezayen's MSc Thesis Proposal, */
 /* "An AI-Assisted Heritage Risk Assessment and Decision-Support Framework", GIU 2026 */
 
 const BANDS_GENERIC = [ // ESS / OIS / HRI classification
@@ -27,7 +27,7 @@ const HRI_TABLE = [
 function classify(score, table){
   // NOTE: bands are defined with integer min/max (e.g. 41-60, 61-80). Scores are
   // floats (e.g. 60.2), so matching on "score>=min && score<=max" leaves a gap
-  // between 60 and 61 that no band covers — any score landing in that gap fell
+  // between 60 and 61 that no band covers, any score landing in that gap fell
   // through to the fallback (the LAST band, i.e. "Critical"), which is why a
   // score of 60.2 was previously showing as Critical while 60 showed Fair and
   // 61 showed Poor. Matching on score<=max only (bands are contiguous and

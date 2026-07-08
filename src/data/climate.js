@@ -2,7 +2,7 @@ import { clamp, computeESS } from './formulas.js';
 
 /* ---------- Climate Scenario Engine ----------
    No fixed formula exists in the proposal for translating SSP pathways into
-   projected ESS/BCS — this is an explicit open question in the methodology.
+   projected ESS/BCS, this is an explicit open question in the methodology.
    This prototype implements one transparent, documented approach:
    1) Apply IPCC AR6 temperature deltas to the raw environmental indicators
       (temperature shifts directly; humidity assumed to fall with regional
@@ -13,7 +13,7 @@ import { clamp, computeESS } from './formulas.js';
       material vulnerability realization, per the framework's theoretical basis.
    4) OIS is treated as non-climatic and held constant, consistent with the
       proposal's own worked example (Slide 29).
-   k and the indicator-shift assumptions are adjustable constants below —
+   k and the indicator-shift assumptions are adjustable constants below, 
    flagged for expert/supervisor validation. */
 
 const SSP = {
