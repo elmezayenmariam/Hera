@@ -1569,7 +1569,7 @@ function pillarModalHTML(){
       <div class="pill-cols">
         <div>
           <div class="pill-sub">${id==='hri'?'Components & weightings':'Indicators, weightings & benchmarks'}</div>
-          <table class="detail-table">
+          <div class="table-scroll"><table class="detail-table">
             <thead><tr><th>${id==='hri'?'Component':'Indicator'}</th><th>Weight</th><th>Optimal</th><th>Acceptable</th><th>Critical</th></tr></thead>
             <tbody>${d.indicators.map(i=>`<tr>
               <td class="in">${i.name}<span class="uu">${i.unit}</span></td>
@@ -1577,17 +1577,17 @@ function pillarModalHTML(){
               <td class="ok">${i.optimal}</td>
               <td class="mid">${i.acceptable}</td>
               <td class="bad">${i.critical}</td></tr>`).join('')}</tbody>
-          </table>
+          </table></div>
         </div>
         <div>
           <div class="pill-sub">Score classification · 0–100</div>
-          <table class="detail-table bands">
+          <div class="table-scroll"><table class="detail-table bands">
             <thead><tr><th>Score</th><th>Band</th><th>Conservation priority</th></tr></thead>
             <tbody>${RISK_BANDS_DISPLAY.map(bd=>`<tr>
               <td class="w">${bd.range}</td>
               <td><span class="band-dot" style="background:${bandColor(bd.label)}"></span>${bd.label}</td>
               <td>${bd.priority}</td></tr>`).join('')}</tbody>
-          </table>
+          </table></div>
         </div>
       </div>
       <details class="pill-refs">

@@ -721,10 +721,12 @@ details summary:hover{color:var(--purple2);}
      phones that just left-justifies short lines oddly, so center both. */
   .hri-banner{flex-direction:column; text-align:center;}
   .hri-banner > div{text-align:center !important;}
-  /* compare-table / climate-scenario table: let the table itself scroll
-     sideways within its own box instead of overflowing the card / viewport. */
+  /* compare-table / climate-scenario table / pillar-modal benchmark tables:
+     let the table itself scroll sideways within its own box instead of its
+     5-column content squeezing unreadably small or overflowing the modal. */
   .table-scroll{overflow-x:auto; -webkit-overflow-scrolling:touch; margin:12px -2px 0; border-radius:var(--r-md);}
   .table-scroll .compare-table{min-width:560px; margin-top:0;}
+  .table-scroll .detail-table{min-width:420px;}
 }
 
 @media(max-width:560px){
