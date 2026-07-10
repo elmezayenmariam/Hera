@@ -739,8 +739,9 @@ details summary:hover{color:var(--purple2);}
   .side-brand{padding:0 92px 0 0; margin-bottom:0; min-height:40px;}
   .side-brand .bt .sub{display:none;}
   .side-eyebrow{display:none;}
-  .side-steps{margin-top:8px;}
+  .side-steps{margin-top:8px; gap:2px;}
   .side-steps .side-step:first-child{display:none;}
+  .side-step{padding:8px 6px;}
   .side-foot{display:none;}
   .mobile-quicknav{display:flex;}
 }
