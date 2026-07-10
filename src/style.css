@@ -731,6 +731,18 @@ details summary:hover{color:var(--purple2);}
   .table-scroll .detail-table{min-width:420px;}
 }
 
+/* Phone-only pinned top-right nav (Home + Compare). Declared BEFORE the
+   max-width:560px block below so the display:none default loses to that
+   block's display:flex on phones (equal specificity -> later source wins).
+   If this block moves after the media query, the nav goes invisible again. */
+.mobile-quicknav{display:none; position:absolute; top:10px; right:10px; gap:8px; z-index:2;}
+.mobile-quicknav button{
+  position:relative; width:36px; height:36px; padding:0; border-radius:10px; display:grid; place-items:center;
+  background:rgba(255,255,255,.08); border:1px solid var(--side-border); color:var(--side-text);
+}
+.mobile-quicknav button.active{background:linear-gradient(150deg,var(--purple),var(--purple-dark)); border-color:var(--purple-dark); color:#fff;}
+.mobile-quicknav .cnt{position:absolute; top:-6px; right:-6px; font-size:10px; font-weight:700; color:#fff; background:var(--purple); padding:1px 5px; border-radius:20px; line-height:1.4; border:1.5px solid var(--side);}
+
 @media(max-width:560px){
   /* Compact phone header: drop the subtitle/eyebrow to cut the ribbon's
      height, hide the Home entry from the step rail and the footer's Compare
@@ -756,13 +768,6 @@ details summary:hover{color:var(--purple2);}
   .side-foot{display:none;}
   .mobile-quicknav{display:flex;}
 }
-.mobile-quicknav{display:none; position:absolute; top:10px; right:10px; gap:8px; z-index:2;}
-.mobile-quicknav button{
-  position:relative; width:36px; height:36px; padding:0; border-radius:10px; display:grid; place-items:center;
-  background:rgba(255,255,255,.08); border:1px solid var(--side-border); color:var(--side-text);
-}
-.mobile-quicknav button.active{background:linear-gradient(150deg,var(--purple),var(--purple-dark)); border-color:var(--purple-dark); color:#fff;}
-.mobile-quicknav .cnt{position:absolute; top:-6px; right:-6px; font-size:10px; font-weight:700; color:#fff; background:var(--purple); padding:1px 5px; border-radius:20px; line-height:1.4; border:1.5px solid var(--side);}
 
 /* ==========================================================================
    V3 ADDITIONS, animations, card-flip popups, entry transition,
