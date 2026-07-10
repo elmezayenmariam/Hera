@@ -1104,14 +1104,8 @@ function switchCapTab(id){
   const panel = document.querySelector('.cap-panel');
   if(!panel){ render(); return; }
   const body = capPanelBody(id, buildActionPlan(state.scenario));
-  // On phones, switching to a much shorter panel while scrolled further down
-  // than that panel's new total height forces the browser to clamp the scroll
-  // position, which reads as the whole ribbon "jumping". Anchoring to the top
-  // of the tab strip first turns that into a deliberate, stable reset instead.
-  if(isMobileViewport()){
-    const tabs = document.querySelector('.cap-tabs');
-    if(tabs) tabs.scrollIntoView({block:'start'});
-  }
+  // Deliberately no programmatic scrolling here (page or tab strip): the
+  // ribbon should only ever move in response to the user's own touch/swipe.
   panel.classList.add('cap-fade');
   setTimeout(()=>{ panel.innerHTML = body; panel.classList.remove('cap-fade'); }, 150);
 }
