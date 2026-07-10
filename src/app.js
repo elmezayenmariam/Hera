@@ -700,15 +700,24 @@ const ISSUE_TEMPLATES = {
 
 /* Scored variant of retrieveKnowledge for Evidence-tab confidence display.
    Mirrors the existing tag-overlap logic exactly; does not alter or call
-   through retrieveKnowledge, so that function remains untouched. */
-function retrieveKnowledgeScored(queryTags, topN){
+   through retrieveKnowledge, so that function remains untouched.
+   optional primaryTag: the specific issue's own tag (e.g. 'materialdecay'),
+   boosted only for ranking (sortScore), not for the displayed matchScore,
+   so a chunk actually about this issue outranks one that only matches the
+   broad building/scenario-wide context tags (hotarid, egypt, temperature,
+   etc.) that get added to every issue's query regardless of topic. Without
+   this, unrelated issues previously converged on the same generic top
+   chunk, which then also drove the Visual Guidance image query, so
+   different issues rendered identical captions and identical photos. */
+function retrieveKnowledgeScored(queryTags, topN, primaryTag){
   topN = topN || 6;
   const scored = KNOWLEDGE_BASE.map(chunk=>{
     let score = 0;
     queryTags.forEach(qt=>{ if(chunk.tags.includes(qt)) score += 1; });
-    return Object.assign({matchScore:score}, chunk);
+    const sortScore = score + ((primaryTag && chunk.tags.includes(primaryTag)) ? 10 : 0);
+    return Object.assign({matchScore:score, sortScore}, chunk);
   }).filter(c=>c.matchScore>0);
-  scored.sort((a,b)=>b.matchScore-a.matchScore);
+  scored.sort((a,b)=>b.sortScore-a.sortScore);
   return scored.slice(0, topN);
 }
 
@@ -722,11 +731,20 @@ function buildActionPlan(scenarioKey){
   const criticalIndicators = computeCriticalIndicators(essR, bcsR, oisR);
   const b = a.b;
 
+  // Tracks which KB chunk each earlier issue already claimed as its headline
+  // (top) evidence, so two different issues in the same plan don't surface
+  // the identical excerpt/caption (and, via visualConfigFor, the identical photo).
+  const usedTopEvidenceIds = new Set();
   let items = criticalIndicators.map(ci=>{
     const tmpl = ISSUE_TEMPLATES[ci.key];
     if(!tmpl) return null;
     const priority = priorityFromLabel(ci.label);
-    const evidence = retrieveKnowledgeScored(Array.from(new Set([ci.key, ...a.queryTags])), 4);
+    let evidence = retrieveKnowledgeScored(Array.from(new Set([ci.key, ...a.queryTags])), 4, ci.key);
+    if(evidence.length > 1 && usedTopEvidenceIds.has(evidence[0].id)){
+      const alt = evidence.find(e=>!usedTopEvidenceIds.has(e.id));
+      if(alt) evidence = [alt, ...evidence.filter(e=>e.id!==alt.id)];
+    }
+    if(evidence[0]) usedTopEvidenceIds.add(evidence[0].id);
     const why = `This recommendation responds to <b>${ci.name}</b> (indicator score ${ci.score.toFixed(1)}/100, classified <b>${ci.label}</b>). At the <b>${a.scenarioLabel}</b> scenario the Heritage Risk Index is <b>${a.hri.toFixed(1)}</b> (${a.hriCls.label}), against a Current (baseline) HRI of <b>${hriCurrent.toFixed(1)}</b>, with <b>${a.drivers.join(' + ')}</b> identified as the dominant risk driver(s). Given this building's <b>${b.material|| '-'}</b> construction and its current adaptive reuse as a <b>${b.use}</b>, this intervention is prioritized within the <b>${a.hriCls.priority}</b> conservation category.`;
     return {id: ci.key+'_'+ci.name.replace(/\s+/g,''), issue:tmpl.issue, priority, why,
       expectedOutcome:tmpl.expectedOutcome, recommendation:tmpl.recommendation,
@@ -894,7 +912,7 @@ function retrieveMedia(tags, topN){
    Results are cached (in-memory + localStorage) so the same query is never
    re-fetched needlessly, and the app still functions with no connection, 
    getImages() just returns a graceful "offline" status the UI can render. */
-const IMAGE_CACHE_KEY = 'hera_image_cache_v2';   // v2: 800px thumbs (was 480)
+const IMAGE_CACHE_KEY = 'hera_image_cache_v3';   // v3: category-boosted + keyword-reranked results (was v2: 800px thumbs)
 const IMAGE_CACHE_TTL_MS = 30*24*60*60*1000; // 30 days
 
 function loadImageCache(){
@@ -911,29 +929,90 @@ function persistImageCache(){
 function stripTags(html){
   return (html||'').replace(/<[^>]*>/g,'').replace(/\s+/g,' ').trim();
 }
-function imageCacheKey(query){ return 'img:'+query.toLowerCase().trim(); }
+// query can be a plain search string (case studies, building photos) or a
+// {query, category, keywords} config (Visual Guidance, see VISUAL_CONFIG) -
+// the cache key only ever depends on the search string itself.
+function imageCacheKey(query){
+  const q = (query && typeof query === 'object') ? query.query : query;
+  return 'img:'+q.toLowerCase().trim();
+}
 
-async function searchWikimediaImages(query, maxN){
-  maxN = maxN || 3;
-  const url = `https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrsearch=${encodeURIComponent(query+' filetype:bitmap')}&gsrlimit=${maxN}&gsrnamespace=6&prop=imageinfo&iiprop=url|extmetadata&iiurlwidth=800&format=json&origin=*`;
+function mapCommonsPage(p){
+  const info = p.imageinfo[0];
+  const meta = info.extmetadata || {};
+  const categories = stripTags(meta.Categories && meta.Categories.value);
+  const objectName = stripTags(meta.ObjectName && meta.ObjectName.value);
+  const description = stripTags(meta.ImageDescription && meta.ImageDescription.value);
+  const title = (p.title||'').replace(/^File:/,'').replace(/\.[a-zA-Z0-9]+$/,'');
+  return {
+    id: 'wc'+p.pageid,
+    title,
+    thumbUrl: info.thumburl || info.url,
+    fullUrl: info.url,
+    descriptionUrl: info.descriptionurl,
+    credit: stripTags(meta.Artist && meta.Artist.value) || 'Unknown author',
+    license: stripTags(meta.LicenseShortName && meta.LicenseShortName.value) || 'See source page',
+    source: 'Wikimedia Commons',
+    // internal only, used for keyword relevance scoring below, stripped before return
+    _searchText: (title+' '+categories+' '+objectName+' '+description).toLowerCase()
+  };
+}
+
+async function fetchWikimediaTextPool(query, limit){
+  const url = `https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrsearch=${encodeURIComponent(query+' filetype:bitmap')}&gsrlimit=${limit}&gsrnamespace=6&prop=imageinfo&iiprop=url|extmetadata&iiurlwidth=800&format=json&origin=*`;
   const data = await fetchJSON(url, {timeoutMs:9000});
   const pages = data && data.query && data.query.pages ? Object.values(data.query.pages) : [];
-  return pages
-    .filter(p=>p.imageinfo && p.imageinfo[0])
-    .map(p=>{
-      const info = p.imageinfo[0];
-      const meta = info.extmetadata || {};
-      return {
-        id: 'wc'+p.pageid,
-        title: (p.title||'').replace(/^File:/,'').replace(/\.[a-zA-Z0-9]+$/,''),
-        thumbUrl: info.thumburl || info.url,
-        fullUrl: info.url,
-        descriptionUrl: info.descriptionurl,
-        credit: stripTags(meta.Artist && meta.Artist.value) || 'Unknown author',
-        license: stripTags(meta.LicenseShortName && meta.LicenseShortName.value) || 'See source page',
-        source: 'Wikimedia Commons'
-      };
+  return pages.filter(p=>p.imageinfo && p.imageinfo[0]).map(mapCommonsPage);
+}
+
+/* Human-curated Commons categories (e.g. "Cracks in brickwork", "Mashrabiya")
+   are a second, higher-trust retrieval source alongside free-text search, a
+   real editor tagged that photo as depicting the thing, not just a keyword
+   coincidence. Optional and best-effort: if the category is empty, renamed, or
+   the request fails, this simply contributes nothing and the free-text pool
+   still carries the search on its own. */
+async function fetchWikimediaCategoryPool(category, limit){
+  try{
+    const url = `https://commons.wikimedia.org/w/api.php?action=query&generator=categorymembers&gcmtitle=${encodeURIComponent('Category:'+category)}&gcmtype=file&gcmlimit=${limit}&prop=imageinfo&iiprop=url|extmetadata&iiurlwidth=800&format=json&origin=*`;
+    const data = await fetchJSON(url, {timeoutMs:9000});
+    const pages = data && data.query && data.query.pages ? Object.values(data.query.pages) : [];
+    return pages.filter(p=>p.imageinfo && p.imageinfo[0]).map(mapCommonsPage);
+  }catch(e){ return []; }
+}
+
+/* query is either a plain string, or a {query, category, keywords} config
+   (see VISUAL_CONFIG). For a plain string this behaves exactly as before
+   (top-maxN free-text results, Commons' own ranking). For a config with
+   keywords, it fetches a wider candidate pool (free-text +, if given, the
+   curated category), then client-side re-ranks by counting how many of the
+   issue's own keywords appear in each photo's title/description/Commons
+   categories, the same auditable "count matching tags" approach used by the
+   knowledge-base retrieval (retrieveKnowledgeScored), rather than trusting
+   Commons' generic text relevance alone. A stable sort means: if nothing
+   matches any keyword, the original order (and result set) is unchanged. */
+async function searchWikimediaImages(query, maxN){
+  maxN = maxN || 3;
+  const cfg = (query && typeof query === 'object') ? query : {query};
+  const poolSize = Math.min(maxN*4, 12);
+  const [textPool, categoryPool] = await Promise.all([
+    fetchWikimediaTextPool(cfg.query, poolSize),
+    cfg.category ? fetchWikimediaCategoryPool(cfg.category, Math.min(maxN*3, 8)) : Promise.resolve([])
+  ]);
+
+  const seen = new Set();
+  const merged = [];
+  textPool.forEach(img=>{ if(!seen.has(img.id)){ seen.add(img.id); merged.push(img); } });
+  categoryPool.forEach(img=>{ if(!seen.has(img.id)){ seen.add(img.id); img.fromCategory = true; merged.push(img); } });
+
+  let ranked = merged;
+  if(cfg.keywords && cfg.keywords.length){
+    ranked = merged.map(img=>{
+      const matched = cfg.keywords.filter(k=>img._searchText.includes(k.toLowerCase()));
+      return Object.assign(img, {matchedKeywords: matched, _score: matched.length + (img.fromCategory ? 1 : 0)});
     });
+    ranked.sort((a,b)=>b._score - a._score);
+  }
+  return ranked.slice(0, maxN).map(({_searchText, _score, ...img})=>img);
 }
 
 /* Synchronous read + async populate: the very first call for a query returns
@@ -1132,21 +1211,42 @@ function capStrategy(plan){
 /* Visual guidance is a CHANGING variable: the illustrative photograph shown for
    each issue is retrieved live and depends on the building's own critical
    indicators and material, so it differs from one assessment to the next rather
-   than being a fixed standard image. This maps each issue's dominant tag to a
-   concrete, Wikimedia-searchable subject so the retrieval returns a relevant
-   photo instead of an empty result. */
-// Short, concrete subjects verified to return photographs on Wikimedia Commons.
-const VISUAL_QUERY = {
-  cracking:'masonry crack', materialdecay:'deteriorated stone',
-  surfaceloss:'eroded stone facade', biologicalgrowth:'lichen growth stone wall',
-  solar:'building shading louvers', humidity:'damp masonry',
-  saltcrystallization:'efflorescence wall', temperature:'sandstone weathering',
-  occupancy:'historic building museum visitors', masonry:'weathered stone wall'
+   than being a fixed standard image. Each issue maps to a concrete, Wikimedia-
+   searchable subject (query), an optional human-curated Commons category to
+   pull extra candidates from (category), and a keyword list used to re-rank
+   every candidate photo by actual relevance (keywords), see
+   searchWikimediaImages(). Queries/categories are short, concrete phrases
+   verified against the live Commons API to return on-topic photographs. */
+const VISUAL_CONFIG = {
+  cracking: {query:'masonry crack', category:'Cracks in brickwork',
+    keywords:['crack','fissure','fracture','split','masonry','brickwork']},
+  materialdecay: {query:'deteriorated stone',
+    keywords:['decay','deteriorat','disintegrat','crumbl','stone','masonry']},
+  surfaceloss: {query:'eroded stone facade',
+    keywords:['erosion','eroded','spalling','flaking','weathering','facade','surface']},
+  biologicalgrowth: {query:'lichen growth stone wall',
+    keywords:['lichen','algae','moss','fungus','biological','growth']},
+  solar: {query:'mashrabiya', category:'Mashrabiya',
+    keywords:['mashrabiya','shading','shutter','screen','lattice','louvre','louver']},
+  humidity: {query:'rising damp wall',
+    keywords:['damp','moisture','water damage','stain','wet']},
+  saltcrystallization: {query:'efflorescence wall', category:'Efflorescence',
+    keywords:['efflorescence','salt','crystalliz','subflorescence']},
+  temperature: {query:'sandstone weathering',
+    keywords:['weathering','sandstone','thermal','sun','crack']},
+  occupancy: {query:'historic building museum visitors', category:'Historic house museums',
+    keywords:['museum','visitor','tourist','crowd','historic house']},
+  masonry: {query:'weathered stone wall',
+    keywords:['masonry','stone wall','weathered']}
 };
-function visualQueryFor(item){
+function visualConfigFor(item){
+  // Prefer the issue's own key first: evidence tags are shared/overlapping
+  // across issues (several issues can retrieve the same KB chunk), so scanning
+  // them first previously made unrelated issues render the identical photo set.
+  if(item.ci && VISUAL_CONFIG[item.ci.key]) return VISUAL_CONFIG[item.ci.key];
   const tags = item.evidence.flatMap(e=>e.tags);
-  const primary = tags.find(t=>VISUAL_QUERY[t]);
-  return primary ? VISUAL_QUERY[primary] : 'historic facade restoration';
+  const primary = tags.find(t=>VISUAL_CONFIG[t]);
+  return primary ? VISUAL_CONFIG[primary] : {query:'historic facade restoration', keywords:['historic','facade','heritage','building']};
 }
 /* ---------- Tab 3 · Visual Guidance ---------- */
 function capVisual(plan){
@@ -1156,7 +1256,7 @@ function capVisual(plan){
       const tags = item.evidence.flatMap(e=>e.tags);
       const localMedia = retrieveMedia(tags, 3);
       const top = item.evidence[0];
-      const query = visualQueryFor(item);
+      const cfg = visualConfigFor(item);
       return `<div class="diagram-strip">
         <div class="diagram-title">${item.issue}</div>
         <div class="diagram-flow">
@@ -1169,7 +1269,7 @@ function capVisual(plan){
         <div style="margin-top:14px;">
           ${localMedia.length
             ? `<div style="display:flex;gap:12px;flex-wrap:wrap;">${localMedia.map(m=>`<div style="cursor:pointer;" onclick="openCapModal('${m.id}')">${mediaPlaceholder(m.caption)}</div>`).join('')}</div>`
-            : vgImagesHTML(query)}
+            : vgImagesHTML(cfg, item.issue)}
         </div>
       </div>`;
     }).join('')}
@@ -1177,21 +1277,32 @@ function capVisual(plan){
 }
 
 /* Visual-guidance image row: full pictures side by side, caption always visible,
-   source/license subtitle revealed on hover, whole tile links to the original. */
-function vgImagesHTML(query){
-  const entry = getImages(query, 3);
+   source/license subtitle + relevance explanation revealed on hover, whole tile
+   links to the original. cfg is the {query, category, keywords} config from
+   VISUAL_CONFIG; issueLabel names the recommendation this image illustrates.
+   The hover text is data-driven: when searchWikimediaImages() found actual
+   keyword hits on this specific photo (matchedKeywords), it names them, so the
+   explanation reflects real, per-image evidence rather than a generic caveat. */
+function vgImagesHTML(cfg, issueLabel){
+  const entry = getImages(cfg, 3);
   if(entry.status==='loading') return `<div class="media-placeholder"><div class="media-placeholder-icon">${icon('search',26)}</div><div class="media-placeholder-text">Searching Wikimedia Commons…</div></div>`;
   if(entry.status==='offline') return `<div class="media-placeholder"><div class="media-placeholder-icon">${icon('wifiOff',26)}</div><div class="media-placeholder-text">Offline. Connect to load images.</div></div>`;
-  if(entry.status==='error') return `<div class="media-placeholder"><div class="media-placeholder-icon">${icon('alert',26)}</div><div class="media-placeholder-text">${entry.error}</div></div><button class="cg-retry" onclick='retryImages(${JSON.stringify(query)},3)'>${icon('refresh',14)} Retry</button>`;
+  if(entry.status==='error') return `<div class="media-placeholder"><div class="media-placeholder-icon">${icon('alert',26)}</div><div class="media-placeholder-text">${entry.error}</div></div><button class="cg-retry" onclick='retryImages(${JSON.stringify(cfg)},3)'>${icon('refresh',14)} Retry</button>`;
   if(entry.status==='empty' || !entry.images.length) return mediaPlaceholder('No matching images found for this recommendation');
-  return `<div class="vg-imgs">${entry.images.map(img=>`
+  return `<div class="vg-imgs">${entry.images.map(img=>{
+    const relevance = (img.matchedKeywords && img.matchedKeywords.length)
+      ? `Shown for <b>${issueLabel}</b>, matched on “${img.matchedKeywords.join(', ')}” in this photo's own title/description/Commons categories${img.fromCategory ? `, and listed directly under Commons' "${cfg.category}" category` : ''}. Automated match, not a curated photo of this exact building, so treat it as illustrative.`
+      : `Shown for <b>${issueLabel}</b>, matched by the keyword search "${cfg.query}" against Commons file titles/descriptions, an automated match, not a curated photo of this building, so treat it as illustrative rather than a literal depiction.`;
+    return `
     <a class="vg-img" href="${img.descriptionUrl}" target="_blank" rel="noopener noreferrer" title="Open original on Wikimedia Commons">
       <span class="vg-media"><img src="${img.thumbUrl}" alt="${(img.title||'').replace(/"/g,'&quot;')}" loading="lazy" onerror="this.closest('.vg-img').style.display='none'"></span>
       <span class="vg-cap">
         <span class="vg-title">${img.title}</span>
         <span class="vg-sub">${img.source} · ${img.license} · Open original →</span>
+        <span class="vg-relevance">${relevance}</span>
       </span>
-    </a>`).join('')}</div>`;
+    </a>`;
+  }).join('')}</div>`;
 }
 
 /* ---------- Tab 4 · Related Case Studies ---------- */
