@@ -686,7 +686,12 @@ details summary:hover{color:var(--purple2);}
   .side-brand .bt{display:flex;}
   .side-eyebrow{display:none;}
   .side-steps{flex-direction:row; overflow-x:auto; gap:8px; padding-bottom:4px; scrollbar-width:thin;}
-  .side-step{flex:0 0 auto; justify-content:flex-start; gap:8px; padding:8px 12px;}
+  /* width:auto is essential: the base .side-step sets width:100% for the
+     vertical desktop rail, and flex:0 0 auto keeps flex-basis at that width,
+     so without this each step stays full-container-width and the horizontal
+     row overflows (every icon 100% wide). Resetting to auto lets each button
+     shrink to its icon so all steps sit side by side. */
+  .side-step{flex:0 0 auto; width:auto; justify-content:flex-start; gap:8px; padding:8px 12px;}
   .side-step .tx{display:none; opacity:1;}
   .side-step.active{padding-right:16px;}
   .side-step.active .tx{display:flex;}
