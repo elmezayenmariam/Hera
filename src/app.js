@@ -1104,6 +1104,14 @@ function switchCapTab(id){
   const panel = document.querySelector('.cap-panel');
   if(!panel){ render(); return; }
   const body = capPanelBody(id, buildActionPlan(state.scenario));
+  // On phones, switching to a much shorter panel while scrolled further down
+  // than that panel's new total height forces the browser to clamp the scroll
+  // position, which reads as the whole ribbon "jumping". Anchoring to the top
+  // of the tab strip first turns that into a deliberate, stable reset instead.
+  if(isMobileViewport()){
+    const tabs = document.querySelector('.cap-tabs');
+    if(tabs) tabs.scrollIntoView({block:'start'});
+  }
   panel.classList.add('cap-fade');
   setTimeout(()=>{ panel.innerHTML = body; panel.classList.remove('cap-fade'); }, 150);
 }
@@ -1459,7 +1467,12 @@ const state = {
 
 const STEPS = ['Home','Building Info','Environmental (ESS)','Condition (BCS)','Occupancy (OIS)','Current HRI','Climate Scenarios','Conservation Action Plan'];
 
-function go(step){ state.step = step; render(); window.scrollTo({top:0,behavior:'smooth'}); }
+/* Mobile browsers (iOS Safari in particular) can drop/interrupt a 'smooth'
+   scrollTo when it overlaps the reflow from render()'s own DOM swap, leaving
+   the page part-scrolled instead of at the top; an instant jump has nothing
+   to interrupt. Desktop keeps the smooth scroll, phones get the reliable one. */
+function isMobileViewport(){ return window.innerWidth <= 640; }
+function go(step){ state.step = step; render(); window.scrollTo({top:0, behavior: isMobileViewport() ? 'auto' : 'smooth'}); }
 
 /* ============================== RENDER HELPERS ============================== */
 function gauge(score, label, size=160){
@@ -1893,6 +1906,16 @@ function sidebarHTML(){
       <span class="side-mono">H</span>
       <span class="bt"><span class="nm">HERA</span><span class="sub">Heritage Risk Assessment<br>& Decision Support</span></span>
     </div>
+    <!-- Phone-only compact nav (see .mobile-quicknav, hidden above ~560px): pins
+         Home + Compare as small icon buttons top-right instead of letting the
+         full step rail + footer stack take up most of the screen. -->
+    <div class="mobile-quicknav">
+      <button onclick="state.compareView=false;go(0)" title="Home" aria-label="Home">${icon('home',16)}</button>
+      <button class="${state.compareView?'active':''}" onclick="toggleCompare()" title="${state.compareView?'Back to assessment':'Compare buildings'}" aria-label="Compare buildings">
+        ${icon('compare',16)}
+        ${!state.compareView && state.projects.length ? `<span class="cnt">${state.projects.length}</span>` : ''}
+      </button>
+    </div>
     <div class="side-eyebrow">Assessment Workflow</div>
     <nav class="side-steps">${steps}</nav>
     <div class="side-foot">
@@ -1923,7 +1946,7 @@ function header(){
   </div>`;
 }
 
-function toggleCompare(){ state.compareView = !state.compareView; render(); window.scrollTo({top:0,behavior:'smooth'}); }
+function toggleCompare(){ state.compareView = !state.compareView; render(); window.scrollTo({top:0, behavior: isMobileViewport() ? 'auto' : 'smooth'}); }
 
 function newAssessment(){
   state.building = blankBuilding();
@@ -1974,69 +1997,6 @@ function removeProject(id){
 }
 
 /* ============================== PAGES ============================== */
-/* ---------- Art Nouveau corner ornament (landing "What is HERA" frame) ----------
-   One hand-drawn corner flourish, drawn for the TOP-LEFT and mirrored via CSS
-   transforms for the other three corners. Inline SVG so it inherits theme colors
-   (terracotta strokes) and scales crisply at any size, which is what makes the
-   frame adapt cleanly from desktop to phone: the corners shrink with clamp()
-   while the plain double border between them stretches. Muted teal + ochre leaf
-   fills echo the Art Nouveau reference artwork. */
-function ornamentCorner(){
-  return `<svg viewBox="0 0 200 200" fill="none" aria-hidden="true">
-    <path d="M200 12 C150 6 96 8 62 16 C34 22 16 38 14 62" stroke="var(--purple)" stroke-width="2.6" stroke-linecap="round" opacity=".85"/>
-    <path d="M12 200 C6 150 8 96 16 62" stroke="var(--purple)" stroke-width="2.6" stroke-linecap="round" opacity=".85"/>
-    <path d="M14 62 C18 80 38 86 48 74 C56 64 48 50 36 54 C28 57 27 66 33 69" stroke="var(--purple)" stroke-width="2.2" stroke-linecap="round" opacity=".8"/>
-    <path d="M96 10 C88 26 100 40 116 36 C128 33 129 18 118 16" stroke="var(--purple)" stroke-width="2" stroke-linecap="round" opacity=".7"/>
-    <path d="M10 96 C26 88 40 100 36 116 C33 128 18 129 16 118" stroke="var(--purple)" stroke-width="2" stroke-linecap="round" opacity=".7"/>
-    <path d="M150 9 C146 18 152 26 162 24" stroke="var(--purple)" stroke-width="1.7" stroke-linecap="round" opacity=".55"/>
-    <path d="M9 150 C18 146 26 152 24 162" stroke="var(--purple)" stroke-width="1.7" stroke-linecap="round" opacity=".55"/>
-    <path d="M52 34 C62 22 80 20 88 28 C80 40 62 44 52 34 Z" fill="#C4703C" opacity=".9"/>
-    <path d="M34 52 C22 62 20 80 28 88 C40 80 44 62 34 52 Z" fill="#C4703C" opacity=".9"/>
-    <path d="M50 50 C58 40 74 38 82 46 C72 54 58 58 50 50 Z" fill="var(--mod)" opacity=".85"/>
-    <path d="M50 50 C40 58 38 74 46 82 C54 72 58 58 50 50 Z" fill="var(--mod)" opacity=".85"/>
-    <circle cx="52" cy="52" r="7" fill="var(--purple)" opacity=".9"/>
-    <circle cx="52" cy="52" r="3" fill="#F1E7D6"/>
-    <path d="M120 12 C132 2 152 1 166 7 C154 19 132 21 120 12 Z" fill="#5E8073" opacity=".88"/>
-    <path d="M76 16 C84 4 100 0 112 5 C104 16 88 22 76 16 Z" fill="#7FA192" opacity=".88"/>
-    <path d="M12 120 C2 132 1 152 7 166 C19 154 21 132 12 120 Z" fill="#5E8073" opacity=".88"/>
-    <path d="M16 76 C4 84 0 100 5 112 C16 104 22 88 16 76 Z" fill="#7FA192" opacity=".88"/>
-    <path d="M138 26 C142 18 150 18 154 24 C150 32 142 32 138 26 Z" fill="#C97B4A" opacity=".9"/>
-    <path d="M26 138 C18 142 18 150 24 154 C32 150 32 142 26 138 Z" fill="#C97B4A" opacity=".9"/>
-    <circle cx="104" cy="22" r="3" fill="var(--purple)" opacity=".8"/>
-    <circle cx="22" cy="104" r="3" fill="var(--purple)" opacity=".8"/>
-    <circle cx="66" cy="66" r="2.6" fill="var(--mod)" opacity=".9"/>
-    <circle cx="176" cy="14" r="2.2" fill="var(--mod)" opacity=".75"/>
-    <circle cx="14" cy="176" r="2.2" fill="var(--mod)" opacity=".75"/>
-  </svg>`;
-}
-/* Symmetric palmette centered on the top/bottom border (mirrored for bottom). */
-function ornamentEdge(){
-  return `<svg viewBox="0 0 240 80" fill="none" aria-hidden="true">
-    <path d="M120 14 C112 26 112 40 120 50 C128 40 128 26 120 14 Z" fill="var(--purple)" opacity=".88"/>
-    <path d="M120 44 C104 30 84 26 64 32 C56 34 52 42 58 46" stroke="var(--purple)" stroke-width="2" stroke-linecap="round" opacity=".75"/>
-    <path d="M120 44 C136 30 156 26 176 32 C184 34 188 42 182 46" stroke="var(--purple)" stroke-width="2" stroke-linecap="round" opacity=".75"/>
-    <path d="M84 28 C74 18 58 16 46 22 C56 32 72 36 84 28 Z" fill="#5E8073" opacity=".85"/>
-    <path d="M156 28 C166 18 182 16 194 22 C184 32 168 36 156 28 Z" fill="#5E8073" opacity=".85"/>
-    <path d="M98 22 C92 12 80 8 70 11 C76 21 88 26 98 22 Z" fill="#7FA192" opacity=".85"/>
-    <path d="M142 22 C148 12 160 8 170 11 C164 21 152 26 142 22 Z" fill="#7FA192" opacity=".85"/>
-    <circle cx="98" cy="34" r="2.6" fill="var(--mod)" opacity=".9"/>
-    <circle cx="142" cy="34" r="2.6" fill="var(--mod)" opacity=".9"/>
-    <circle cx="120" cy="58" r="3" fill="#C4703C" opacity=".9"/>
-  </svg>`;
-}
-/* Vertical leaf sprig centered on the left/right border (mirrored for right). */
-function ornamentSide(){
-  return `<svg viewBox="0 0 70 200" fill="none" aria-hidden="true">
-    <path d="M34 8 C26 40 26 70 34 100 C42 130 42 160 34 192" stroke="var(--purple)" stroke-width="2" stroke-linecap="round" opacity=".75"/>
-    <path d="M34 52 C44 42 60 40 68 46 C60 56 44 60 34 52 Z" fill="#5E8073" opacity=".85"/>
-    <path d="M34 148 C44 138 60 136 68 142 C60 152 44 156 34 148 Z" fill="#7FA192" opacity=".85"/>
-    <path d="M34 100 m-7 0 a7 7 0 1 0 14 0 a7 7 0 1 0 -14 0" fill="#C4703C" opacity=".9"/>
-    <circle cx="34" cy="100" r="2.6" fill="#F1E7D6"/>
-    <circle cx="44" cy="74" r="2.4" fill="var(--mod)" opacity=".85"/>
-    <circle cx="44" cy="126" r="2.4" fill="var(--mod)" opacity=".85"/>
-  </svg>`;
-}
-
 /* ---------- Cinematic landing (step 0, full-bleed, no sidebar) ---------- */
 function heroRoute(){
   // Wadi-Rum-style trek line: the assessment pipeline as an expedition route.
@@ -2079,7 +2039,7 @@ function pageHome(){
 
     <header class="hero-cine">
       <video class="hero-video" autoplay muted loop playsinline preload="auto" poster="">
-        <source src="/hero.mp4" type="video/mp4">
+        <source src="${import.meta.env.BASE_URL}hero.mp4" type="video/mp4">
       </video>
       <div class="hero-scrim"></div>
       <div class="hero-inner">
@@ -2096,23 +2056,13 @@ function pageHome(){
     </header>
 
     <section class="landing-intro" id="about">
-      <div class="ornate-frame reveal">
-        <span class="of-corner tl" aria-hidden="true">${ornamentCorner()}</span>
-        <span class="of-corner tr" aria-hidden="true">${ornamentCorner()}</span>
-        <span class="of-corner bl" aria-hidden="true">${ornamentCorner()}</span>
-        <span class="of-corner br" aria-hidden="true">${ornamentCorner()}</span>
-        <span class="of-edge top" aria-hidden="true">${ornamentEdge()}</span>
-        <span class="of-edge bottom" aria-hidden="true">${ornamentEdge()}</span>
-        <span class="of-side left" aria-hidden="true">${ornamentSide()}</span>
-        <span class="of-side right" aria-hidden="true">${ornamentSide()}</span>
-        <div class="intro-wrap">
-          <span class="eyebrow">What is HERA</span>
-          <h2 id="twTarget" class="tw"><span class="tw-type"></span><span class="tw-caret"></span></h2>
-          <p class="tw-after">HERA reads environmental stress, building condition and occupancy into a single Heritage Risk
-          Index, projected forward under IPCC climate scenarios, and turns that score into a prioritized,
-          source-grounded conservation plan for adaptive-reuse heritage buildings.</p>
-          <button class="btn-solid tw-after" onclick="startAssessment()"><span>Start Assessment</span> ${icon('arrowRight',17)}</button>
-        </div>
+      <div class="intro-wrap reveal">
+        <span class="eyebrow">What is HERA</span>
+        <h2 id="twTarget" class="tw"><span class="tw-type"></span><span class="tw-caret"></span></h2>
+        <p class="tw-after">HERA reads environmental stress, building condition and occupancy into a single Heritage Risk
+        Index, projected forward under IPCC climate scenarios, and turns that score into a prioritized,
+        source-grounded conservation plan for adaptive-reuse heritage buildings.</p>
+        <button class="btn-solid tw-after" onclick="startAssessment()"><span>Start Assessment</span> ${icon('arrowRight',17)}</button>
       </div>
     </section>
 
@@ -2312,9 +2262,9 @@ function pageESS(){
       <div class="badge-row"><span class="badge">Optimal &lt;200</span><span class="badge">Acceptable 200–500</span><span class="badge">Critical &gt;500</span></div>
     </div>
 
-    <div style="display:flex;align-items:center;gap:32px;margin-top:24px;flex-wrap:wrap;">
+    <div class="gauge-row" style="margin-top:24px;">
       ${gauge(r.score, cls.label)}
-      <div style="flex:1;min-width:220px;">
+      <div class="gauge-bars">
         ${barRow('Temperature', r.parts.Temperature)}
         ${barRow('Humidity', r.parts.Humidity)}
         ${barRow('Solar Radiation', r.parts.Solar)}
@@ -2357,9 +2307,9 @@ function pageBCS(){
       </div>
     </div>
 
-    <div style="display:flex;align-items:center;gap:32px;margin-top:12px;flex-wrap:wrap;">
+    <div class="gauge-row" style="margin-top:12px;">
       ${gauge(r.score, cls.label)}
-      <div style="flex:1;min-width:220px;">
+      <div class="gauge-bars">
         ${barRow('Material Decay', r.parts.MaterialDecay)}
         ${barRow('Cracking', r.parts.Cracking)}
         ${barRow('Surface Loss', r.parts.SurfaceLoss)}
@@ -2395,9 +2345,9 @@ function pageOIS(){
       </select>
     </div>
 
-    <div style="display:flex;align-items:center;gap:32px;margin-top:12px;flex-wrap:wrap;">
+    <div class="gauge-row" style="margin-top:12px;">
       ${gauge(r.score, cls.label)}
-      <div style="flex:1;min-width:220px;">
+      <div class="gauge-bars">
         ${barRow('Occupancy Density', r.parts.OccupancyDensity)}
         ${barRow('Visitor Load', r.parts.VisitorLoad)}
         ${barRow('Event Frequency', r.parts.EventFrequency)}
@@ -2532,7 +2482,7 @@ function climateReactiveHTML(){
   const selCls = classify(sel.hri, HRI_TABLE);
   const drivers = dominantDrivers(sel.ess, sel.bcs, sel.ois);
   const strat = getStrategy(selCls.priority, drivers);
-  return `<table class="compare-table">
+  return `<div class="table-scroll"><table class="compare-table">
       <thead><tr><th>Scenario</th><th>ESS</th><th>BCS</th><th>OIS</th><th>HRI</th><th>Risk</th></tr></thead>
       <tbody>
         ${Object.keys(scenarios).map(k=>{
@@ -2543,7 +2493,7 @@ function climateReactiveHTML(){
           </tr>`;
         }).join('')}
       </tbody>
-    </table>
+    </table></div>
 
     <div class="future-block">
       <h2 style="font-size:18px;">Decision Matrix, ${sel.label}</h2>
@@ -2657,7 +2607,7 @@ function pageCompare(){
       <div class="note">No buildings saved yet. Run an assessment, then click <b>Save to Comparison</b> on the Results page to add it here.</div>
       <div class="navrow"><span></span><button class="primary" onclick="newAssessment()">${icon('arrowRight',16)} Start an Assessment</button></div>
     ` : `
-      <table class="compare-table">
+      <div class="table-scroll"><table class="compare-table">
         <thead><tr><th>Building</th><th>Use</th><th>HRI</th><th>Risk</th><th>Priority</th><th>Action</th></tr></thead>
         <tbody>
           ${list.map((p,i)=>{
@@ -2675,7 +2625,7 @@ function pageCompare(){
             </tr>`;
           }).join('')}
         </tbody>
-      </table>
+      </table></div>
 
       <div class="future-block">
         <h2 style="font-size:16px;">Relative Risk</h2>

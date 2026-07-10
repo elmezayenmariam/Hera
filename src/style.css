@@ -319,6 +319,9 @@ button.primary:disabled{background:var(--muted); border-color:var(--muted);}
 .gauge-wrap{display:flex; flex-direction:column; align-items:center; padding:10px 0 0;}
 .gauge-score{font-size:44px; font-weight:800; margin-top:-58px; color:var(--text);}
 .gauge-label{font-size:12.5px; font-weight:700; padding:5px 15px; border-radius:20px; margin-top:8px; letter-spacing:.01em;}
+/* Gauge + its indicator bars, side by side on desktop (ESS/BCS/OIS pages). */
+.gauge-row{display:flex; align-items:center; gap:32px; flex-wrap:wrap;}
+.gauge-bars{flex:1; min-width:220px;}
 
 /* ==========================================================================
    RESULTS / SCORES
@@ -431,7 +434,10 @@ button.primary:disabled{background:var(--muted); border-color:var(--muted);}
 .cap-tab.active{color:var(--purple2); border-bottom-color:var(--purple); background:var(--accent-tint);}
 .cap-tab:hover{color:var(--text);}
 @media(max-width:640px){
-  .cap-tabs{overflow-x:auto; scrollbar-width:none;}
+  .cap-tabs{overflow-x:auto; scrollbar-width:none;
+    /* Keeps switchCapTab()'s scrollIntoView() landing below the sticky mobile
+       header ribbon instead of tucking the tabs underneath it. */
+    scroll-margin-top:100px;}
   .cap-tabs::-webkit-scrollbar{display:none;}
   .cap-tab{flex:0 0 auto;}
 }
@@ -582,35 +588,6 @@ details summary:hover{color:var(--purple2);}
 .landing-intro{background:var(--bg2); border-bottom:1px solid var(--border); padding:clamp(70px,12vh,140px) clamp(20px,4vw,52px); text-align:center;}
 .intro-wrap{max-width:780px; margin:0 auto; display:flex; flex-direction:column; align-items:center;}
 
-/* --- Art Nouveau frame around the intro (corner ornaments + mid-edge motifs
-       + double border). Fixed-aspect SVG pieces scale via clamp() while the
-       plain border between them stretches, so the frame spans the full page
-       width on desktop (aligned to the same gutters as the nav/hero) and
-       adapts down to phone without distorting the artwork. --- */
-.ornate-frame{position:relative; margin:0 auto;
-  padding:clamp(56px,10vw,96px) clamp(38px,8vw,90px);
-  border:1.5px solid rgba(176,83,42,.35); border-radius:10px;}
-.ornate-frame::before{content:""; position:absolute; inset:7px; border:1px solid rgba(176,83,42,.16); border-radius:6px; pointer-events:none;}
-.of-corner{position:absolute; width:clamp(70px,14vw,170px); line-height:0; pointer-events:none;}
-.of-corner svg{width:100%; height:auto; display:block;}
-.of-corner.tl{top:-10px; left:-10px;}
-.of-corner.tr{top:-10px; right:-10px; transform:scaleX(-1);}
-.of-corner.bl{bottom:-10px; left:-10px; transform:scaleY(-1);}
-.of-corner.br{bottom:-10px; right:-10px; transform:scale(-1,-1);}
-/* palmette centered on the top/bottom border */
-.of-edge{position:absolute; left:50%; width:clamp(140px,20vw,240px); line-height:0; pointer-events:none;}
-.of-edge svg{width:100%; height:auto; display:block;}
-.of-edge.top{top:-14px; transform:translateX(-50%);}
-.of-edge.bottom{bottom:-14px; transform:translateX(-50%) scaleY(-1);}
-/* leaf sprig centered on the left/right border */
-.of-side{position:absolute; top:50%; width:clamp(36px,4vw,58px); line-height:0; pointer-events:none;}
-.of-side svg{width:100%; height:auto; display:block;}
-.of-side.left{left:-11px; transform:translateY(-50%);}
-.of-side.right{right:-11px; transform:translateY(-50%) scaleX(-1);}
-@media(max-width:700px){
-  .of-side{display:none;}            /* short phone edges: corners + palmettes suffice */
-  .of-edge{width:clamp(110px,32vw,160px);}
-}
 .intro-wrap .eyebrow{margin-bottom:18px;}
 .intro-wrap h2{font-family:var(--serif); font-weight:500; font-size:clamp(30px,4.6vw,52px); line-height:1.08; letter-spacing:-.02em; color:var(--text); margin-bottom:22px;}
 .intro-wrap h2 em{font-style:italic; color:var(--purple);}
@@ -730,6 +707,46 @@ details summary:hover{color:var(--purple2);}
   .navrow{flex-direction:column-reverse; align-items:stretch;}
   .navrow button{width:100%;}
 }
+
+/* ==========================================================================
+   PHONE-ONLY FIXES (does not touch tablet/desktop breakpoints above)
+   ========================================================================== */
+@media(max-width:640px){
+  /* Gauge stacks above its bars, centered, instead of pinned to the left with
+     empty space beside it once the bars column wraps below on a narrow screen. */
+  .gauge-row{flex-direction:column; justify-content:center;}
+  .gauge-bars{width:100%;}
+  /* The HRI banner's right-hand block used text-align:right (inline style) to
+     line up alongside the score on desktop; once the two halves stack on
+     phones that just left-justifies short lines oddly, so center both. */
+  .hri-banner{flex-direction:column; text-align:center;}
+  .hri-banner > div{text-align:center !important;}
+  /* compare-table / climate-scenario table: let the table itself scroll
+     sideways within its own box instead of overflowing the card / viewport. */
+  .table-scroll{overflow-x:auto; -webkit-overflow-scrolling:touch; margin:12px -2px 0; border-radius:var(--r-md);}
+  .table-scroll .compare-table{min-width:560px; margin-top:0;}
+}
+
+@media(max-width:560px){
+  /* Compact phone header: drop the subtitle/eyebrow to cut the ribbon's
+     height, hide the Home entry from the step rail and the footer's Compare
+     button, and show the small pinned top-right pair (.mobile-quicknav,
+     rendered in sidebarHTML()) in their place instead. */
+  .side-panel{position:relative; padding:10px 92px 10px 14px;}
+  .side-brand{padding:0; margin-bottom:0; min-height:0;}
+  .side-brand .bt .sub{display:none;}
+  .side-eyebrow{display:none;}
+  .side-steps .side-step:first-child{display:none;}
+  .side-foot{display:none;}
+  .mobile-quicknav{display:flex;}
+}
+.mobile-quicknav{display:none; position:absolute; top:10px; right:10px; gap:8px; z-index:2;}
+.mobile-quicknav button{
+  position:relative; width:36px; height:36px; padding:0; border-radius:10px; display:grid; place-items:center;
+  background:rgba(255,255,255,.08); border:1px solid var(--side-border); color:var(--side-text);
+}
+.mobile-quicknav button.active{background:linear-gradient(150deg,var(--purple),var(--purple-dark)); border-color:var(--purple-dark); color:#fff;}
+.mobile-quicknav .cnt{position:absolute; top:-6px; right:-6px; font-size:10px; font-weight:700; color:#fff; background:var(--purple); padding:1px 5px; border-radius:20px; line-height:1.4; border:1.5px solid var(--side);}
 
 /* ==========================================================================
    V3 ADDITIONS, animations, card-flip popups, entry transition,
