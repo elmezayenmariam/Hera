@@ -742,6 +742,12 @@ details summary:hover{color:var(--purple2);}
   .side-steps{margin-top:8px; gap:2px;}
   .side-steps .side-step:first-child{display:none;}
   .side-step{padding:8px 6px;}
+  /* The active step's label (shown at the >560px breakpoint) made that one
+     button far wider than the rest, which alone forced the row to overflow
+     and need scrolling. Keeping every step icon-only, uniform width, is what
+     actually lets all 7 sit beside each other with no scroll needed. */
+  .side-step.active{padding:8px 6px;}
+  .side-step.active .tx{display:none;}
   .side-foot{display:none;}
   .mobile-quicknav{display:flex;}
 }
